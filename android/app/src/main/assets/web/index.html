@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Marty TV</title>
+<style>
+:root{
+  --bg:#0b0b14; --bg2:#12121f; --card:#1a1a2c; --line:#2a2a44;
+  --txt:#f2f2f7; --mut:#9a9ab0; --accent:#e11d48; --accent2:#f43f5e; --gold:#fbbf24;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--txt);
+  font-family:"Segoe UI",Roboto,Helvetica,Arial,sans-serif; overflow-x:hidden;}
+body{user-select:none;-webkit-user-select:none;}
+#app{max-width:1280px;margin:0 auto;padding:0 24px 80px;}
+header{display:flex;align-items:center;gap:16px;padding:18px 0 10px;
+  border-bottom:1px solid var(--line);flex-wrap:wrap;}
+.logo{font-size:30px;font-weight:800;letter-spacing:.5px;color:#fff;}
+.logo b{color:var(--accent);}
+.tag{color:var(--mut);font-size:14px;}
+.spacer{flex:1;}
+.clock{color:var(--mut);font-size:18px;font-variant-numeric:tabular-nums;min-width:76px;text-align:right;}
+button{font-family:inherit;cursor:pointer;}
+.langbtn,.iconbtn{background:var(--card);color:var(--txt);border:1px solid var(--line);
+  border-radius:10px;padding:8px 14px;font-size:16px;}
+.langbtn:hover,.iconbtn:hover{background:#23233a;}
+
+/* busca */
+.searchwrap{display:flex;gap:8px;align-items:center;}
+#search{background:var(--card);border:1px solid var(--line);border-radius:10px;
+  color:var(--txt);font-size:17px;padding:9px 14px;width:230px;outline:none;}
+#search:focus{border-color:var(--accent);}
+section{margin-top:26px;}
+.sec-title{display:flex;align-items:center;gap:10px;font-size:22px;font-weight:700;margin:0 0 12px;}
+.sec-title .bar{width:5px;height:24px;background:var(--accent);border-radius:3px;}
+.sec-title small{color:var(--mut);font-weight:400;font-size:14px;}
+
+/* fileiras horizontais */
+.hrow{display:flex;gap:14px;overflow-x:auto;padding:6px 2px 14px;scroll-behavior:smooth;}
+.hrow::-webkit-scrollbar{height:8px;}
+.hrow::-webkit-scrollbar-thumb{background:#33334d;border-radius:4px;}
+
+/* cards */
+.card{flex:0 0 auto;width:200px;background:var(--card);border:2px solid transparent;
+  border-radius:14px;padding:12px;cursor:pointer;transition:transform .12s, border-color .12s, background .12s;}
+.card:focus,.card.focus{outline:none;border-color:var(--accent);transform:scale(1.05);background:#23233a;}
+.card .ico{font-size:26px;}
+.card h4{margin:8px 0 4px;font-size:17px;font-weight:700;line-height:1.25;}
+.card .meta{color:var(--mut);font-size:13px;line-height:1.45;}
+.card .now{color:#fff;font-size:13px;margin-top:6px;}
+.card .now b{color:var(--gold);font-weight:600;}
+
+/* posters (filmes) */
+.pcard{flex:0 0 auto;width:150px;cursor:pointer;border:2px solid transparent;border-radius:12px;padding:6px;transition:transform .12s,border-color .12s;}
+.pcard:focus,.pcard.focus{outline:none;border-color:var(--accent);transform:scale(1.07);background:#1e1e33;}
+.pcard .poster{width:100%;height:210px;border-radius:8px;background:linear-gradient(135deg,#23233a,#16162a);
+  display:flex;align-items:center;justify-content:center;overflow:hidden;}
+.pcard .poster img{width:100%;height:100%;object-fit:cover;display:block;}
+.pcard .poster .ph{font-size:34px;color:#4a4a68;}
+.pcard .pt{font-size:13.5px;font-weight:600;margin-top:7px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.pcard .py{color:var(--mut);font-size:12px;margin-top:2px;}
+
+/* grid de filmes */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;}
+
+/* linha de canal de filme (grande) */
+.chcard{flex:0 0 auto;width:340px;background:var(--card);border:2px solid transparent;border-radius:16px;padding:16px;cursor:pointer;transition:transform .12s,border-color .12s;}
+.chcard:focus,.chcard.focus{outline:none;border-color:var(--accent);transform:scale(1.03);background:#20203a;}
+.chcard .ctop{display:flex;align-items:center;gap:10px;}
+.chcard .cdot{width:12px;height:12px;border-radius:50%;background:var(--accent);animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.chcard h3{margin:0;font-size:19px;}
+.chcard .row{margin-top:10px;font-size:14px;color:var(--mut);}
+.chcard .row b{color:var(--gold);}
+.chcard .row .t{color:#fff;}
+
+/* player overlay */
+#player{position:fixed;inset:0;background:#000;z-index:50;display:none;flex-direction:column;}
+#player.on{display:flex;}
+#phead{display:flex;align-items:center;gap:12px;padding:14px 20px;background:rgba(0,0,0,.6);}
+#ptitle{font-size:19px;font-weight:700;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+#pmeta{color:#c8c8d8;font-size:14px;}
+#phead .iconbtn{font-size:15px;}
+#video-wrap{flex:1;display:flex;align-items:center;justify-content:center;min-height:0;background:#000;}
+#video{width:100%;height:100%;object-fit:contain;background:#000;}
+#pfoot{display:flex;gap:12px;align-items:center;justify-content:center;padding:16px 20px;background:rgba(0,0,0,.7);flex-wrap:wrap;}
+#pfoot button{background:#1c1c2e;border:1px solid #333;color:#fff;border-radius:10px;padding:12px 18px;font-size:16px;}
+#pfoot button:focus{outline:none;border-color:var(--accent);}
+#perr{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(8,8,14,.94);z-index:5;text-align:center;padding:24px;}
+#perr.on{display:flex;}
+#perr .box{max-width:560px;}
+#perr h3{color:var(--accent);font-size:22px;margin:0 0 10px;}
+#perr p{color:#cfcfdf;font-size:16px;line-height:1.5;}
+
+/* tela de detalhe (programação) */
+#detail{position:fixed;inset:0;background:rgba(6,6,12,.97);z-index:40;display:none;overflow-y:auto;padding:30px 40px 60px;}
+#detail.on{display:block;}
+#detail h2{margin:6px 0 4px;font-size:26px;}
+#detail .sub{color:var(--mut);margin-bottom:18px;}
+.sch{display:flex;gap:14px;align-items:flex-start;padding:10px 12px;border-radius:10px;cursor:pointer;border:2px solid transparent;}
+.sch:focus,.sch.focus{outline:none;border-color:var(--accent);background:#1c1c30;}
+.sch .time{color:var(--gold);font-variant-numeric:tabular-nums;min-width:150px;font-size:15px;padding-top:2px;}
+.sch .st{font-size:16px;font-weight:600;}
+.sch .sy{color:var(--mut);font-size:13px;}
+.sch.nowrow{background:#1a1a2e;}
+
+/* toasts + misc */
+#toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:#20203a;border:1px solid #3a3a5a;
+  color:#fff;padding:12px 20px;border-radius:12px;font-size:15px;z-index:99;display:none;max-width:90%;text-align:center;}
+#toast.on{display:block;}
+.hint{color:var(--mut);font-size:13px;margin-top:8px;}
+.footer{margin-top:40px;padding:20px 0;border-top:1px solid var(--line);color:var(--mut);font-size:13px;line-height:1.6;}
+.footer b{color:#c8c8d8;}
+input[type=text],input[type=url],textarea{background:var(--card);border:1px solid var(--line);color:var(--txt);
+  border-radius:10px;padding:10px 14px;font-size:16px;outline:none;width:100%;margin:6px 0;font-family:inherit;}
+input:focus,textarea:focus{border-color:var(--accent);}
+.mineform{max-width:620px;background:var(--card);border-radius:16px;padding:20px;margin-top:8px;}
+.mineform label{font-size:14px;color:var(--mut);}
+.btn{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:11px 20px;font-size:16px;font-weight:700;}
+.btn:focus{outline:none;box-shadow:0 0 0 3px rgba(225,29,72,.5);}
+.minelist .card{width:100%;max-width:620px;margin-top:10px;display:flex;align-items:center;gap:10px;}
+.minelist .card .ico{font-size:22px;}
+.minelist .card h4{margin:0;flex:1;}
+.del{background:transparent;border:1px solid #3a3a5a;color:#b9b9cc;border-radius:8px;padding:6px 10px;font-size:13px;}
+.del:hover{border-color:var(--accent);color:#fff;}
+@media (max-width:640px){ #app{padding:0 14px 60px;} .chcard{width:280px;} .card{width:170px;} }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header>
+    <div class="logo">Marty<b>TV</b></div>
+    <div class="tag" id="tagline">Canais, filmes e documentários — grátis e legais</div>
+    <div class="spacer"></div>
+    <div class="searchwrap">
+      <input id="search" type="text" placeholder="Buscar filme..." data-fk>
+      <button class="iconbtn" id="searchbtn" data-fk>🔎</button>
+    </div>
+    <button class="langbtn" id="langbtn" data-fk>ES</button>
+    <div class="clock" id="clock"></div>
+  </header>
+
+  <section id="sec-channels">
+    <div class="sec-title"><div class="bar"></div><span id="t-channels">Canais de Filme 24h</span>
+      <small id="t-channelsSub">programação gerada de filmes de domínio público</small></div>
+    <div class="hrow" id="row-channels"></div>
+  </section>
+
+  <section id="sec-live">
+    <div class="sec-title"><div class="bar"></div><span id="t-live">Ao Vivo</span>
+      <small id="t-liveSub">canais oficiais, gratuitos e legais</small></div>
+    <div class="hrow" id="row-live"></div>
+  </section>
+
+  <section id="sec-lib">
+    <div class="sec-title"><div class="bar"></div><span id="t-lib">Filmes</span>
+      <small id="t-libSub">acervo Internet Archive — domínio público</small></div>
+    <div class="hrow" id="row-lib"></div>
+  </section>
+
+  <section id="sec-grid" style="display:none">
+    <div class="sec-title"><div class="bar"></div><span id="grid-title">Todos os filmes</span></div>
+    <div class="grid" id="grid"></div>
+  </section>
+
+  <section id="sec-mine">
+    <div class="sec-title"><div class="bar"></div><span id="t-mine">Meus canais</span>
+      <small id="t-mineSub">adicione qualquer URL .m3u8/.mp4 ou cole uma lista .m3u</small></div>
+    <div class="mineform">
+      <label id="l-url">URL do canal (.m3u8 / .mp4)</label>
+      <input type="url" id="inp-url" placeholder="https://.../index.m3u8">
+      <label id="l-name">Nome do canal</label>
+      <input type="text" id="inp-name" placeholder="Meu Canal">
+      <button class="btn" id="btn-add" data-fk>➕ <span id="b-add">Adicionar</span></button>
+      <div class="hint" id="hint-m3u">Ou cole uma lista .m3u inteira no campo de URL — o app separa os canais sozinho.</div>
+    </div>
+    <div class="minelist" id="mine-list"></div>
+  </section>
+
+  <section id="sec-favs">
+    <div class="sec-title"><div class="bar"></div><span id="t-favs">Favoritos</span></div>
+    <div class="hrow" id="row-favs"></div>
+  </section>
+
+  <div class="footer">
+    <b>MartyTV</b> — conteúdo 100% gratuito e legal: filmes de domínio público do
+    <b>Internet Archive</b> e transmissões oficiais de emissoras públicas.
+    Sem pirataria, sem mensalidade, sem cadastro. Funciona no navegador de qualquer TV,
+    computador ou celular. Use as <b>setas do controle</b> para navegar e <b>OK</b> para assistir.
+    Para TVs mais antigas (antes de ~2018), o navegador precisa estar atualizado.
+  </div>
+</div>
+
+<!-- player -->
+<div id="player">
+  <div id="phead">
+    <button class="iconbtn" id="pback" data-fk>✕ Sair</button>
+    <div>
+      <div id="ptitle">—</div>
+      <div id="pmeta"></div>
+    </div>
+    <div class="spacer"></div>
+    <button class="iconbtn" id="pfav" data-fk>☆</button>
+  </div>
+  <div id="video-wrap"><video id="video" playsinline></video></div>
+  <div id="pfoot">
+    <button id="pnext" data-fk>⏭ <span id="b-next">Próximo</span></button>
+    <button id="ppause" data-fk>⏸ <span id="b-pause">Pausar</span></button>
+    <button id="pmute" data-fk>🔊</button>
+  </div>
+  <div id="perr"><div class="box">
+    <h3 id="t-perr">Não foi possível tocar este canal</h3>
+    <p id="perr-text"></p>
+    <button class="btn" id="perr-close" data-fk>OK</button>
+  </div></div>
+</div>
+
+<!-- detalhe do canal de filme -->
+<div id="detail">
+  <button class="iconbtn" id="detail-back" data-fk>✕ <span id="b-back">Voltar</span></button>
+  <h2 id="detail-title">—</h2>
+  <div class="sub" id="detail-sub"></div>
+  <div id="sch-list"></div>
+</div>
+
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js"></script>
+<script>
+"use strict";
+/* ============================================================
+   MartyTV — TV gratuita e legal (PT/ES)
+   Fontes: Internet Archive (domínio público) + streams oficiais
+   ============================================================ */
+
+var IA = "https://archive.org";
+var HLSOK = typeof Hls !== "undefined";
+
+/* ---------- i18n ---------- */
+var T = {
+  pt:{
+    tagline:"Canais, filmes e documentários — grátis e legais",
+    channels:"Canais de Filme 24h", channelsSub:"programação gerada de filmes de domínio público",
+    live:"Ao Vivo", liveSub:"canais oficiais, gratuitos e legais",
+    lib:"Filmes", libSub:"acervo Internet Archive — domínio público",
+    mine:"Meus canais", mineSub:"adicione qualquer URL .m3u8/.mp4 ou cole uma lista .m3u",
+    favs:"Favoritos", gridAll:"Todos os filmes",
+    now:"AGORA", next:"A SEGUIR", watch:"Assistir", schedule:"Programação de hoje",
+    searchPh:"Buscar filme...", add:"Adicionar", urlLabel:"URL do canal (.m3u8 / .mp4)",
+    nameLabel:"Nome do canal", hintM3u:"Ou cole uma lista .m3u inteira no campo de URL — o app separa os canais sozinho.",
+    back:"Voltar", pause:"Pausar", play:"Continuar", next:"Próximo", exit:"Sair",
+    perr:"Não foi possível tocar este canal",
+    perrText:"Este fluxo pode estar fora do ar, bloquear navegadores por política do emissor, ou o navegador desta TV não suporta HLS. Tente outro canal ou adicione sua própria URL em \"Meus canais\".",
+    loading:"Carregando...", empty:"Nada por aqui ainda", error:"Erro de conexão — verifique a internet.",
+    added:"Canal adicionado!", removed:"Removido", favAdd:"Adicionado aos favoritos", favDel:"Removido dos favoritos",
+    searchRes:"Resultados para", none:"Nenhum resultado. Tente outro nome.",
+    free:"GRÁTIS", ofc:"OFICIAL", myCanal:"Canal pessoal"
+  },
+  es:{
+    tagline:"Canales, películas y documentales — gratis y legales",
+    channels:"Canales de Cine 24h", channelsSub:"programación generada con películas de dominio público",
+    live:"En Vivo", liveSub:"canales oficiales, gratuitos y legales",
+    lib:"Películas", libSub:"acervo Internet Archive — dominio público",
+    mine:"Mis canales", mineSub:"agrega cualquier URL .m3u8/.mp4 o pega una lista .m3u",
+    favs:"Favoritos", gridAll:"Todas las películas",
+    now:"AHORA", next:"DESPUÉS", watch:"Ver", schedule:"Programación de hoy",
+    searchPh:"Buscar película...", add:"Agregar", urlLabel:"URL del canal (.m3u8 / .mp4)",
+    nameLabel:"Nombre del canal", hintM3u:"O pega una lista .m3u completa en el campo de URL — la app separa los canales sola.",
+    back:"Volver", pause:"Pausar", play:"Continuar", next:"Siguiente", exit:"Salir",
+    perr:"No fue posible reproducir este canal",
+    perrText:"El flujo puede estar fuera del aire, bloquear navegadores por política del emisor, o el navegador de esta TV no soporta HLS. Prueba otro canal o agrega tu propia URL en \"Mis canales\".",
+    loading:"Cargando...", empty:"Nada por aquí todavía", error:"Error de conexión — verifica tu internet.",
+    added:"¡Canal agregado!", removed:"Eliminado", favAdd:"Agregado a favoritos", favDel:"Eliminado de favoritos",
+    searchRes:"Resultados para", none:"Sin resultados. Prueba otro nombre.",
+    free:"GRATIS", ofc:"OFICIAL", myCanal:"Canal personal"
+  }
+};
+var lang = localStorage.getItem("mtv_lang") || "pt";
+function t(k){ var d = T[lang] || T.pt; return d[k] !== undefined ? d[k] : (T.pt[k]||k); }
+function setLang(l){ lang = l; localStorage.setItem("mtv_lang", l); location.reload(); }
+
+/* ---------- estado ---------- */
+var metaCache = {};            // id -> {dur,url,title,year,broken}
+var chItemsCache = {};         // chId -> [{id,title,year}]
+var favs = JSON.parse(localStorage.getItem("mtv_favs") || "[]");
+var mine = JSON.parse(localStorage.getItem("mtv_mine") || "[]");
+var playerCtx = null;          // {kind:'live'|'movie'|'url', item?, ch?, pos?}
+var hlsObj = null;
+
+/* ---------- canais de filme (consultas verificadas em 2026-11-10) ---------- */
+var MOVIE_CHANNELS = [
+  {id:"classicos", q:"collection:feature_films", color:"#e11d48", icon:"🎬",
+   pt:"Clássicos do Cinema", es:"Clásicos del Cine"},
+  {id:"scifi", q:"collection:SciFi_Horror", color:"#8b5cf6", icon:"👽",
+   pt:"Sci-Fi & Terror", es:"Ciencia Ficción y Terror"},
+  {id:"comedia", q:"collection:Comedy_Films", color:"#f59e0b", icon:"😂",
+   pt:"Comédia", es:"Comedia"},
+  {id:"mudo", q:"collection:silent_films", color:"#0ea5e9", icon:"📽️",
+   pt:"Cinema Mudo", es:"Cine Mudo"},
+  {id:"espanhol", q:'subject:"Spanish cinema" OR subject:"Spanish films" OR subject:"Cine español"',
+   color:"#10b981", icon:"🎞️", pt:"Cine Clásico ES", es:"Cine Clásico ES"}
+];
+
+/* ---------- canais ao vivo OFICIAIS ---------- */
+var LIVE = [
+  {name:"TV Brasil", url:"https://tvbrasil-stream.ebc.com.br/index.m3u8", cat:"Público"},
+  {name:"Canal Gov", url:"https://canalgov-stream.ebc.com.br/index.m3u8", cat:"Público"},
+  {name:"Canal Educação", url:"https://canaleducacao-stream.ebc.com.br/index.m3u8", cat:"Público"},
+  {name:"Canal Libras", url:"https://canallibras-stream.ebc.com.br/mux_video_ts/index-1.m3u8", cat:"Público"},
+  {name:"TV Câmara", url:"https://stream3.camara.gov.br/tv1/manifest.m3u8", cat:"Público"},
+  {name:"TV Câmara 2", url:"https://stream3.camara.gov.br/tv2/manifest.m3u8", cat:"Público"},
+  {name:"TV Cultura", url:"https://player-tvcultura.stream.uol.com.br/live/tvcultura.m3u8", cat:"Público"},
+  {name:"Cultura Fast", url:"https://fpa-gateway.tvcultura.com.br:8181/memfs/606caef0-a290-413d-9f1f-8fcdb3a73831.m3u8", cat:"Público"},
+  {name:"TVE RS", url:"https://streaming.procergs.com.br:8443/tve/stve/playlist.m3u8", cat:"Público"},
+  {name:"TV UFOP", url:"https://app.tvufop.com.br/hls/tvufop.m3u8", cat:"Público"},
+  {name:"SESC TV", url:"https://slbps-ml-sambatech.akamaized.net/samba-live/2472/7424/8a00fe7cc36ac263b2c3e9324497d5ff/video/93a9920d-1b24-4c5e-a7d2-63d5489f59b5_index.m3u8", cat:"Cultura"},
+  {name:"Record News", url:"https://rnw-rn.otteravision.com/rnw/rn/rnw_rn.m3u8", cat:"Notícias"},
+  {name:"CNN Brasil", url:"https://d25usgadhphvwi.cloudfront.net/hls/main.m3u8", cat:"Notícias"},
+  {name:"Canal UOL", url:"https://video24.mais.uol.com.br/live/6146.m3u8", cat:"Notícias"},
+  {name:"ge FAST (Globo)", url:"https://dfr80qz435crc.cloudfront.net/EFGH/Amagi/Globo/GE_Fast_BR/GE_Fast.m3u8", cat:"Esportes"},
+  {name:"Amazon Sat", url:"https://amazonsat.brasilstream.com.br/hls/amazonsat/index.m3u8", cat:"Regional"},
+  {name:"Nuevo Tiempo (ES)", url:"https://stream.live.novotempo.com/tv/smil:tvnuevotiempo.smil/playlist.m3u8", cat:"Español"}
+];
+
+/* ---------- helpers ---------- */
+function $(s){ return document.querySelector(s); }
+function esc(s){ var d=document.createElement("div"); d.textContent=s; return d.innerHTML; }
+function toast(msg){ var el=$("#toast"); el.textContent=msg; el.classList.add("on");
+  clearTimeout(toast._tm); toast._tm=setTimeout(function(){ el.classList.remove("on"); },2600); }
+function chName(ch){ return lang==="es" ? ch.es : ch.pt; }
+function fmtClock(d){ return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); }
+function fmtDur(sec){ if(!sec) return "—";
+  var h=Math.floor(sec/3600), m=Math.floor((sec%3600)/60);
+  if(h>0) return h+"h"+String(m).padStart(2,"0"); return m+"min"; }
+function todayStart(){ var d=new Date(); d.setHours(0,0,0,0); return d.getTime(); }
+
+function saveFavs(){ localStorage.setItem("mtv_favs", JSON.stringify(favs)); }
+function isFav(kind,id){ return favs.some(function(f){ return f.kind===kind && f.id===id; }); }
+function toggleFav(kind,id,title,url,year){
+  var i=favs.findIndex(function(f){ return f.kind===kind && f.id===id; });
+  if(i>=0){ favs.splice(i,1); toast(t("favDel")); }
+  else{ favs.unshift({kind:id?kind:"movie",id:id||title,title:title,url:url||"",year:year||""});
+        toast(t("favAdd")); }
+  saveFavs(); renderFavs();
+}
+
+/* ---------- Internet Archive ---------- */
+function iaSearch(query, rows){
+  var u = IA+"/advancedsearch.php?q="+encodeURIComponent(query+" AND mediatype:movies")+
+    "&fl[]=identifier&fl[]=title&fl[]=year&rows="+(rows||80)+
+    "&sort[]=downloads+desc&output=json";
+  return fetch(u).then(function(r){ return r.json(); })
+    .then(function(j){ return (j.response && j.response.docs)||[]; });
+}
+function parseRuntime(s){
+  if(!s) return 0;
+  s = String(s).trim();
+  var m;
+  if(m=s.match(/^(\d+):(\d+):(\d+)/)) return (+m[1])*3600+(+m[2])*60+(+m[3]);
+  if(m=s.match(/^(\d+):(\d+)/)) return (+m[1])*60+(+m[2]);
+  if(m=s.match(/^(\d+)$/)) return +m[1];
+  return 0;
+}
+function pickFile(files){
+  var rank={"h.264":4,"512Kb MPEG4":3,"MPEG4":2,"Matroska":0};
+  var best=null,bestScore=-1;
+  (files||[]).forEach(function(f){
+    if(!f.name || !f.size) return;
+    if(/\.(mp4|m4v|mpeg|webm|mkv)$/i.test(f.name)===false && !/h\.264|mpeg4/i.test(f.format||"")) return;
+    if(/\.(jpg|png|gif|txt|xml|json|srt|nfo|sqlite)$/i.test(f.name)) return;
+    var sc=(rank[f.format]!==undefined?rank[f.format]*1e12:1e10)+parseInt(f.size,10);
+    if(sc>bestScore){ bestScore=sc; best=f; }
+  });
+  return best;
+}
+function iaMeta(id){
+  if(metaCache[id]) return Promise.resolve(metaCache[id]);
+  return fetch(IA+"/metadata/"+id).then(function(r){ return r.json(); }).then(function(j){
+    var f = pickFile(j.files||[]);
+    var out = { dur: parseRuntime(j.metadata&&j.metadata.runtime)||5400,
+                url: f ? IA+"/download/"+id+"/"+f.name.split("/").map(encodeURIComponent).join("/") : "",
+                title: (j.metadata&&j.metadata.title)||id,
+                year: (j.metadata&&j.metadata.year)||"" };
+    metaCache[id]=out; return out;
+  }).catch(function(){ metaCache[id]={dur:5400,url:"",title:id,year:""}; return metaCache[id]; });
+}
+function iaPoster(id){ return IA+"/services/img/"+id; }
+
+/* ---------- carregamento de dados ---------- */
+function loadChannelItems(ch){
+  if(chItemsCache[ch.id]) return Promise.resolve(chItemsCache[ch.id]);
+  return iaSearch(ch.q, 90).then(function(docs){
+    var items = docs.filter(function(d){ return d.identifier; });
+    chItemsCache[ch.id] = items;
+    return items;
+  });
+}
+/* durações de um trecho da programação (busca em lotes até cobrir targetSec) */
+function scheduleAt(ch, targetSec){
+  return loadChannelItems(ch).then(function(items){
+    if(!items.length) return {items:[], idx:0, off:0, known:{}, total:0};
+    var known={}, total=0, i=0;
+    function step(){
+      if(i>=items.length) return Promise.resolve(null);
+      var j0=i, batch=items.slice(i,i+8); i+=8;
+      return Promise.all(batch.map(function(it){ return iaMeta(it.identifier); }))
+        .then(function(metas){
+          batch.forEach(function(it,k){ known[it.identifier]=metas[k].dur; });
+          for(var b=0;b<batch.length;b++){
+            var d=known[batch[b].identifier]||0;
+            if(total + d > targetSec){ return {idx:j0+b, off:targetSec-total}; }
+            total += d;
+          }
+          return step();
+        });
+    }
+    return step().then(function(found){
+      if(found && found.idx!==undefined) return {items:items, known:known, idx:found.idx, off:found.off, total:0};
+      var t = total>0 ? (targetSec % total) : targetSec;
+      var acc=0, idx=0, off=0;
+      for(var j=0;j<items.length;j++){
+        var d=known[items[j].identifier]||0;
+        if(acc + d > t){ idx=j; off=t-acc; break; }
+        acc += d;
+      }
+      return {items:items, known:known, idx:idx, off:off, total:total};
+    });
+  });
+}
+/* garante que as durações de uma lista de itens estejam em cache (para a grade) */
+function ensureDurations(items){
+  var p=Promise.resolve();
+  for(var i=0;i<items.length;i+=8){
+    (function(batch){ p=p.then(function(){
+      return Promise.all(batch.map(function(it){ return iaMeta(it.identifier); }));
+    });})(items.slice(i,i+8));
+  }
+  return p;
+}
+
+/* ---------- player ---------- */
+function stopHls(){ try{ if(hlsObj){ hlsObj.destroy(); } }catch(e){} hlsObj=null; }
+function showErr(){ $("#perr").classList.add("on"); $("#perr-text").textContent=t("perrText"); }
+function playUrl(url, title, meta){
+  /* modo nativo (Android TV): entrega o stream ao ExoPlayer — sem limite de CORS */
+  if(window.NativePlayer && typeof window.NativePlayer.play === "function"){
+    try{ window.NativePlayer.play(url, title||"", meta||""); return; }catch(e){ /* segue no player web */ }
+  }
+  var v = $("#video");
+  stopHls();
+  try{ v.pause(); v.removeAttribute("src"); v.load(); }catch(e){}
+  $("#ptitle").textContent = title || "";
+  $("#pmeta").textContent = meta || "";
+  $("#player").classList.add("on");
+  $("#perr").classList.remove("on");
+  var isHls = /\.m3u8($|\?)/i.test(url);
+  function go(){
+    var pr = v.play();
+    if(pr && pr.catch) pr.catch(function(){});
+  }
+  if(isHls && v.canPlayType("application/vnd.apple.mpegurl")){
+    v.src = url; v.addEventListener("loadedmetadata", go, {once:true}); go();
+  } else if(isHls && HLSOK && Hls.isSupported()){
+    hlsObj = new Hls({ enableWorker:true });
+    hlsObj.loadSource(url); hlsObj.attachMedia(v);
+    hlsObj.on(Hls.Events.MANIFEST_PARSED, go);
+    hlsObj.on(Hls.Events.ERROR, function(ev,data){
+      if(data && data.fatal){ showErr(); }
+      else if(data && data.type===Hls.ErrorTypes.NETWORK_ERROR && !data.fatal){ /* retry automático do hls.js */ }
+      else if(data && data.details==="manifestLoadError"){ showErr(); }
+    });
+  } else if(!isHls){
+    v.src = url; go();
+  } else {
+    showErr();
+  }
+}
+function closePlayer(){
+  stopHls();
+  var v=$("#video");
+  try{ v.pause(); v.removeAttribute("src"); v.load(); }catch(e){}
+  $("#player").classList.remove("on");
+  playerCtx=null;
+}
+
+/* tocar um filme do Internet Archive */
+function playMovie(item, ch){
+  iaMeta(item.identifier).then(function(m){
+    if(!m.url){ toast(t("error")); return; }
+    playerCtx = {kind:"movie", item:item, ch:ch};
+    playUrl(m.url, item.title + (item.year?(" ("+item.year+")"):""), ch? chName(ch)+" • "+fmtDur(m.dur):"Internet Archive • "+fmtDur(m.dur));
+    updatePFav();
+  });
+}
+function playLive(lc){
+  playerCtx = {kind:"live", lc:lc};
+  playUrl(lc.url, lc.name, lc.cat + " • " + t("live"));
+  updatePFav();
+}
+function playMine(mc){
+  playerCtx = {kind:"url", mc:mc};
+  playUrl(mc.url, mc.name, t("myCanal"));
+  updatePFav();
+}
+
+/* próximo filme na programação do canal de filme */
+function playNext(){
+  var ctx=playerCtx;
+  if(!ctx || !ctx.ch) { $("#pnext").style.opacity=.4; return; }
+  var ch=ctx.ch;
+  var start=todayStart();
+  scheduleAt(ch, Date.now()-start).then(function(s){
+    if(!s.items.length) return;
+    var ni = s.idx+1;
+    if(ni>=s.items.length) ni=0;
+    playMovie(s.items[ni], ch);
+  });
+}
+function updatePFav(){
+  var ctx=playerCtx; var b=$("#pfav");
+  if(!ctx){ b.textContent="☆"; return; }
+  var id = ctx.kind==="movie" ? ctx.item.identifier
+        : ctx.kind==="live" ? ctx.lc.url : ctx.mc.url;
+  b.textContent = isFav(ctx.kind,id) ? "★" : "☆";
+}
+
+/* ---------- renderização ---------- */
+function renderChannels(){
+  var row=$("#row-channels"); row.innerHTML="";
+  MOVIE_CHANNELS.forEach(function(ch){
+    var el=document.createElement("div");
+    el.className="chcard"; el.setAttribute("data-fk",""); el.tabIndex=0;
+    el.innerHTML = '<div class="ctop"><div class="cdot" style="background:'+ch.color+'"></div>'+
+      '<h3>'+esc(chName(ch))+'</h3></div>'+
+      '<div class="row"><b>'+t("now")+'</b> <span class="t">'+t("loading")+'</span></div>'+
+      '<div class="row"><b>'+t("next")+'</b> <span class="t2">…</span></div>';
+    el.addEventListener("keydown", onCardKey);
+    el.addEventListener("click", function(){ openSchedule(ch); });
+    row.appendChild(el);
+    /* preenche agora/a seguir */
+    var start=todayStart();
+    scheduleAt(ch, Date.now()-start).then(function(s){
+      if(!s.items.length){ el.querySelector(".t").textContent=t("empty"); return; }
+      var it=s.items[s.idx];
+      el.querySelector(".t").textContent = it.title + (it.year?(" ("+it.year+")"):"");
+      el.querySelector(".t2").textContent = (s.items[s.idx+1]||s.items[0]).title;
+    }).catch(function(){ el.querySelector(".t").textContent=t("error"); });
+  });
+}
+
+function renderLive(){
+  var row=$("#row-live"); row.innerHTML="";
+  LIVE.forEach(function(lc){
+    var el=document.createElement("div");
+    el.className="card"; el.setAttribute("data-fk",""); el.tabIndex=0;
+    el.innerHTML='<div class="ico">📺</div><h4>'+esc(lc.name)+'</h4>'+
+      '<div class="meta">'+esc(lc.cat)+'</div>'+
+      '<div class="now">● <b>'+t("live")+'</b></div>';
+    el.addEventListener("keydown", onCardKey);
+    el.addEventListener("click", function(){ playLive(lc); });
+    row.appendChild(el);
+  });
+}
+
+function posterCard(item, ch, onclick){
+  var el=document.createElement("div");
+  el.className="pcard"; el.setAttribute("data-fk",""); el.tabIndex=0;
+  el.innerHTML='<div class="poster"><img loading="lazy" src="'+iaPoster(item.identifier)+'" alt="">'+
+    '<div class="ph">🎬</div></div>'+
+    '<div class="pt">'+esc(item.title)+'</div>'+
+    '<div class="py">'+esc(item.year||"")+'</div>';
+  el.addEventListener("keydown", onCardKey);
+  el.addEventListener("click", function(){ if(onclick) onclick(); else playMovie(item, ch); });
+  el.querySelector("img").addEventListener("error", function(){
+    this.style.display="none";
+  });
+  return el;
+}
+
+var libItems = null;
+function renderLibrary(){
+  var row=$("#row-lib"); row.innerHTML="";
+  if(!libItems){
+    var msg=document.createElement("div"); msg.className="hint"; msg.textContent=t("loading");
+    row.appendChild(msg);
+    iaSearch("collection:feature_films", 40).then(function(docs){
+      libItems = docs.filter(function(d){ return d.identifier; });
+      renderLibrary();
+    }).catch(function(){ row.innerHTML=""; row.textContent=t("error"); });
+    return;
+  }
+  libItems.forEach(function(item){ row.appendChild(posterCard(item, MOVIE_CHANNELS[0])); });
+  var more=document.createElement("div");
+  more.className="pcard"; more.setAttribute("data-fk",""); more.tabIndex=0;
+  more.innerHTML='<div class="poster"><div class="ph">➕</div></div><div class="pt">'+t("gridAll")+'</div>';
+  more.addEventListener("keydown", onCardKey);
+  more.addEventListener("click", openGrid);
+  row.appendChild(more);
+}
+function openGrid(){
+  $("#sec-grid").style.display="";
+  $("#grid-title").textContent=t("gridAll");
+  var g=$("#grid"); g.innerHTML="";
+  if(!libItems){ renderLibrary(); toast(t("loading")); return; }
+  libItems.forEach(function(item){ g.appendChild(posterCard(item, MOVIE_CHANNELS[0])); });
+  $("#sec-grid").scrollIntoView({behavior:"smooth"});
+}
+function doSearch(){
+  var q=$("#search").value.trim();
+  if(!q){ toast(t("searchPh")); return; }
+  $("#sec-grid").style.display="";
+  $("#grid-title").textContent=t("searchRes")+': "'+q+'"';
+  var g=$("#grid"); g.innerHTML='<div class="hint">'+t("loading")+'</div>';
+  iaSearch('title:('+q.replace(/[()]/g," ")+')', 48).then(function(docs){
+    g.innerHTML="";
+    if(!docs.length){ g.innerHTML='<div class="hint">'+t("none")+'</div>'; return; }
+    docs.forEach(function(item){ g.appendChild(posterCard(item, null)); });
+    $("#sec-grid").scrollIntoView({behavior:"smooth"});
+  }).catch(function(){ g.innerHTML='<div class="hint">'+t("error")+'</div>'; });
+}
+
+function parseM3u(txt){
+  var lines=txt.split(/\r?\n/), out=[], cur=null;
+  lines.forEach(function(ln){
+    ln=ln.trim(); if(!ln) return;
+    if(ln.charAt(0)==="#"){
+      if(ln.indexOf("#EXTINF")===0){
+        var name=ln.split(",").slice(1).join(",").trim() || ("Canal "+(out.length+1));
+        cur={name:name};
+      }
+    } else if(cur){ cur.url=ln; out.push(cur); cur=null; }
+  });
+  return out;
+}
+function renderMine(){
+  var box=$("#mine-list"); box.innerHTML="";
+  if(!mine.length){ box.innerHTML='<div class="hint">'+t("empty")+'</div>'; return; }
+  mine.forEach(function(mc, i){
+    var el=document.createElement("div");
+    el.className="card"; el.setAttribute("data-fk",""); el.tabIndex=0;
+    el.innerHTML='<div class="ico">📺</div><h4>'+esc(mc.name)+'</h4>'+
+      '<button class="del" data-i="'+i+'">✕</button>';
+    el.addEventListener("keydown", onCardKey);
+    el.querySelector("h4").addEventListener("click", function(){ playMine(mc); });
+    el.querySelector(".del").addEventListener("click", function(ev){
+      ev.stopPropagation(); mine.splice(i,1);
+      localStorage.setItem("mtv_mine", JSON.stringify(mine));
+      renderMine(); toast(t("removed"));
+    });
+    box.appendChild(el);
+  });
+}
+function addMine(){
+  var url=$("#inp-url").value.trim(), name=$("#inp-name").value.trim();
+  if(!url) return;
+  if(url.toLowerCase().indexOf("#extm3u")>=0){
+    var found=parseM3u(url);
+    if(found.length){ found.forEach(function(c){ mine.push({name:c.name,url:c.url}); }); }
+  } else {
+    mine.push({name:name||("Canal "+(mine.length+1)), url:url});
+  }
+  localStorage.setItem("mtv_mine", JSON.stringify(mine));
+  $("#inp-url").value=""; $("#inp-name").value="";
+  renderMine(); toast(t("added"));
+}
+
+function renderFavs(){
+  var row=$("#row-favs"); row.innerHTML="";
+  if(!favs.length){ row.innerHTML='<div class="hint">'+t("empty")+'</div>'; return; }
+  favs.forEach(function(f){
+    var el=document.createElement("div");
+    el.className="card"; el.setAttribute("data-fk",""); el.tabIndex=0;
+    el.innerHTML='<div class="ico">★</div><h4>'+esc(f.title)+'</h4>'+
+      '<div class="meta">'+esc(f.year||"")+'</div>';
+    el.addEventListener("keydown", onCardKey);
+    el.addEventListener("click", function(){
+      if(f.kind==="live"){ playLive({name:f.title,url:f.url,cat:""}); }
+      else if(f.kind==="url"){ playMine({name:f.title,url:f.url}); }
+      else if(f.url){ playUrl(f.url, f.title, ""); }
+      else{ playMovie({identifier:f.id,title:f.title,year:f.year}, null); }
+    });
+    row.appendChild(el);
+  });
+}
+
+/* ---------- tela de programação do canal ---------- */
+function openSchedule(ch){
+  $("#detail").classList.add("on");
+  $("#detail-title").textContent=chName(ch);
+  $("#detail-sub").textContent=t("schedule");
+  var list=$("#sch-list");
+  list.innerHTML='<div class="hint">'+t("loading")+'</div>';
+  var start=todayStart();
+  scheduleAt(ch, Date.now()-start).then(function(s){
+    if(!s.items.length){ list.innerHTML='<div class="hint">'+t("empty")+'</div>'; return; }
+    var view=s.items.slice(0,30);
+    ensureDurations(view).then(function(){
+      list.innerHTML="";
+      var acc=0;
+      view.forEach(function(it,k){
+        var m=metaCache[it.identifier]; var d=m?m.dur:0;
+        var st=new Date(start+acc*1000);
+        var en=new Date(start+(acc+(d||5400))*1000);
+        var isNow = (k===s.idx);
+        var el=document.createElement("div");
+        el.className="sch"+(isNow?" nowrow":"");
+        el.setAttribute("data-fk",""); el.tabIndex=0;
+        el.innerHTML='<div class="time">'+fmtClock(st)+" – "+fmtClock(en)+'</div>'+
+          '<div><div class="st">'+esc(it.title)+(isNow?' &nbsp;<b style="color:var(--gold)">● '+t("now")+'</b>':"")+'</div>'+
+          '<div class="sy">'+esc(it.year||"")+' • '+fmtDur(d)+'</div></div>';
+        el.addEventListener("keydown", onCardKey);
+        el.addEventListener("click", function(){ playMovie(it, ch); });
+        list.appendChild(el);
+        acc += d || 5400;
+      });
+    });
+  });
+}
+
+/* ---------- foco / navegação por controle remoto ---------- */
+function vis(el){
+  var r=el.getBoundingClientRect();
+  return r.width>0 && r.height>0 && el.offsetParent!==null;
+}
+function moveFocus(dx, dy){
+  var cur=document.activeElement;
+  var els=Array.prototype.slice.call(document.querySelectorAll("[data-fk], input, button"))
+    .filter(vis);
+  if(!els.length) return;
+  if(!cur || els.indexOf(cur)<0){ els[0].focus(); return; }
+  var rc=cur.getBoundingClientRect(), best=null, bestScore=1e18;
+  els.forEach(function(el){
+    if(el===cur) return;
+    var r=el.getBoundingClientRect();
+    var cx=rc.left+rc.width/2, cy=rc.top+rc.height/2;
+    var ex=r.left+r.width/2, ey=r.top+r.height/2;
+    var ddx=ex-cx, ddy=ey-cy;
+    var ok = dy!==0 ? (Math.sign(ddy)===Math.sign(dy)||ddy===0) : Math.abs(ddx)>Math.max(30,rc.width/2);
+    ok = ok && (dx!==0 ? (Math.sign(ddx)===Math.sign(dx)||ddx===0) : Math.abs(ddy)>Math.max(30,rc.height/2));
+    if(!ok) return;
+    var score = Math.abs(ddx)+Math.abs(ddy) + Math.min(Math.abs(ddx),Math.abs(ddy))*0.6;
+    if(dy!==0) score = Math.abs(ddy)*2 + Math.abs(ddx);
+    if(dx!==0) score = Math.abs(ddx)*2 + Math.abs(ddy);
+    if(score<bestScore){ bestScore=score; best=el; }
+  });
+  if(best){ best.focus(); best.scrollIntoView({block:"nearest",inline:"nearest",behavior:"smooth"}); }
+}
+function onCardKey(ev){
+  if(ev.key==="Enter"||ev.key===" "){ ev.preventDefault(); ev.currentTarget.click(); }
+}
+document.addEventListener("keydown", function(ev){
+  var k=ev.key;
+  if(k==="ArrowUp"){ ev.preventDefault(); moveFocus(0,-1); }
+  else if(k==="ArrowDown"){ ev.preventDefault(); moveFocus(0,1); }
+  else if(k==="ArrowLeft"){ ev.preventDefault(); moveFocus(-1,0); }
+  else if(k==="ArrowRight"){ ev.preventDefault(); moveFocus(1,0); }
+  else if(k==="Backspace"||k==="Escape"){
+    if($("#player").classList.contains("on")){ closePlayer(); return; }
+    if($("#detail").classList.contains("on")){ $("#detail").classList.remove("on"); return; }
+  }
+});
+
+/* ---------- bindings ---------- */
+$("#search").placeholder=t("searchPh");
+$("#searchbtn").addEventListener("click", doSearch);
+$("#search").addEventListener("keydown", function(ev){ if(ev.key==="Enter"){ ev.preventDefault(); doSearch(); } });
+$("#langbtn").addEventListener("click", function(){ setLang(lang==="pt"?"es":"pt"); });
+$("#btn-add").addEventListener("click", addMine);
+$("#pback").addEventListener("click", closePlayer);
+$("#detail-back").addEventListener("click", function(){ $("#detail").classList.remove("on"); });
+$("#ppause").addEventListener("click", function(){
+  var v=$("#video");
+  if(v.paused){ v.play(); $("#ppause").innerHTML="⏸ "+t("pause"); }
+  else{ v.pause(); $("#ppause").innerHTML="▶ "+t("play"); }
+});
+$("#pmute").addEventListener("click", function(){
+  var v=$("#video"); v.muted=!v.muted; this.textContent=v.muted?"🔇":"🔊";
+});
+$("#pnext").addEventListener("click", playNext);
+$("#pfav").addEventListener("click", function(){
+  var ctx=playerCtx; if(!ctx) return;
+  if(ctx.kind==="movie") toggleFav("movie", ctx.item.identifier, ctx.item.title, "", ctx.item.year||"");
+  else if(ctx.kind==="live") toggleFav("live", ctx.lc.url, ctx.lc.name, ctx.lc.url, "");
+  else toggleFav("url", ctx.mc.url, ctx.mc.name, ctx.mc.url, "");
+  updatePFav();
+});
+$("#perr-close").addEventListener("click", function(){ $("#perr").classList.remove("on"); });
+
+/* relógio */
+function tickClock(){ var d=new Date(); $("#clock").textContent=fmtClock(d); }
+tickClock(); setInterval(tickClock, 30000);
+
+/* ---------- i18n estático ---------- */
+function applyI18n(){
+  $("#tagline").textContent=t("tagline");
+  $("#t-channels").textContent=t("channels"); $("#t-channelsSub").textContent=t("channelsSub");
+  $("#t-live").textContent=t("live"); $("#t-liveSub").textContent=t("liveSub");
+  $("#t-lib").textContent=t("lib"); $("#t-libSub").textContent=t("libSub");
+  $("#t-mine").textContent=t("mine"); $("#t-mineSub").textContent=t("mineSub");
+  $("#t-favs").textContent=t("favs");
+  $("#grid-title").textContent=t("gridAll");
+  $("#b-add").textContent=t("add"); $("#l-url").textContent=t("urlLabel");
+  $("#l-name").textContent=t("nameLabel"); $("#hint-m3u").textContent=t("hintM3u");
+  $("#b-next").textContent=t("next"); $("#b-pause").textContent=t("pause");
+  $("#b-back").textContent=t("back");
+  $("#t-perr").textContent=t("perr"); $("#perr-text").textContent=t("perrText");
+  $("#search").placeholder=t("searchPh");
+  $("#langbtn").textContent = lang==="pt" ? "ES" : "PT";
+  document.title = "Marty TV";
+  document.documentElement.lang = lang==="pt"?"pt-BR":"es";
+}
+
+/* ---------- boot ---------- */
+applyI18n();
+renderChannels();
+renderLive();
+renderLibrary();
+renderMine();
+renderFavs();
+</script>
+</body>
+</html>
