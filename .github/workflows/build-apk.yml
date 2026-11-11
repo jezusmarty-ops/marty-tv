@@ -1,10 +1,9 @@
 # ============================================================
 # WORKFLOW PARA O RAIZ DO REPOSITÓRIO jezusmarty-ops/marty-tv
-# (o GitHub Actions só enxerga workflows em .github/workflows na
-#  raiz do repo — este arquivo deve ir para:
-#  .github/workflows/build-apk.yml  do repositório)
+# (deve ir para: .github/workflows/build-apk.yml do repositório)
 #
-# O projeto React Native vive na pasta marty-tv-rn/ do mesmo repo.
+# v2: instalação do Android SDK 100% manual (sem ações de terceiros),
+# mais robusta contra falhas transitórias de download.
 # ============================================================
 name: Build APK (Release)
 
@@ -37,13 +36,18 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Configurar Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Aceitar licenças e instalar plataforma
+      - name: Instalar Android SDK (manual)
         run: |
-          yes | sdkmanager --licenses > /dev/null || true
-          sdkmanager "platforms;android-34" "build-tools;34.0.0" "platform-tools"
+          export ANDROID_HOME=$RUNNER_TEMP/android-sdk
+          export ANDROID_SDK_ROOT=$ANDROID_HOME
+          mkdir -p $ANDROID_HOME/cmdline-tools
+          curl -sSL --retry 3 -o /tmp/cmdtools.zip \
+            https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+          unzip -q -o /tmp/cmdtools.zip -d $ANDROID_HOME/cmdline-tools
+          mv $ANDROID_HOME/cmdline-tools/cmdline-tools $ANDROID_HOME/cmdline-tools/latest
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null || true
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+            "platforms;android-34" "build-tools;34.0.0" "platform-tools"
 
       - name: Configurar Gradle 8.6
         uses: gradle/actions/setup-gradle@v4
@@ -64,12 +68,17 @@ jobs:
       - name: Gerar gradle wrapper (se ausente)
         working-directory: marty-tv-rn/android
         run: |
+          export ANDROID_HOME=$RUNNER_TEMP/android-sdk
+          export ANDROID_SDK_ROOT=$ANDROID_HOME
           if [ ! -f gradlew ]; then gradle wrapper --gradle-version 8.6; fi
           chmod +x gradlew
 
       - name: Compilar APK release
         working-directory: marty-tv-rn/android
-        run: ./gradlew assembleRelease --no-daemon
+        run: |
+          export ANDROID_HOME=$RUNNER_TEMP/android-sdk
+          export ANDROID_SDK_ROOT=$ANDROID_HOME
+          ./gradlew assembleRelease --no-daemon
 
       - name: Publicar APK nos Artifacts
         uses: actions/upload-artifact@v4
