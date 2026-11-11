@@ -41,6 +41,12 @@ section{margin-top:26px;}
 .hrow::-webkit-scrollbar{height:8px;}
 .hrow::-webkit-scrollbar-thumb{background:#33334d;border-radius:4px;}
 
+/* filtros de categoria */
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px;}
+.chip{background:var(--card);border:1px solid var(--line);color:#cfcfdf;border-radius:999px;padding:8px 16px;font-size:14.5px;cursor:pointer;font-family:inherit;}
+.chip:focus,.chip.focus{outline:none;border-color:var(--accent);color:#fff;}
+.chip.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700;}
+
 /* cards */
 .card{flex:0 0 auto;width:200px;background:var(--card);border:2px solid transparent;
   border-radius:14px;padding:12px;cursor:pointer;transition:transform .12s, border-color .12s, background .12s;}
@@ -151,6 +157,7 @@ input:focus,textarea:focus{border-color:var(--accent);}
   <section id="sec-live">
     <div class="sec-title"><div class="bar"></div><span id="t-live">Ao Vivo</span>
       <small id="t-liveSub">canais oficiais, gratuitos e legais</small></div>
+    <div class="chips" id="chips-live"></div>
     <div class="hrow" id="row-live"></div>
   </section>
 
@@ -185,7 +192,7 @@ input:focus,textarea:focus{border-color:var(--accent);}
   </section>
 
   <div class="footer">
-    <b>MartyTV</b> — conteúdo 100% gratuito e legal: filmes de domínio público do
+    <b>MartyTV v1.1</b> — conteúdo 100% gratuito e legal: filmes de domínio público do
     <b>Internet Archive</b> e transmissões oficiais de emissoras públicas.
     Sem pirataria, sem mensalidade, sem cadastro. Funciona no navegador de qualquer TV,
     computador ou celular. Use as <b>setas do controle</b> para navegar e <b>OK</b> para assistir.
@@ -243,7 +250,7 @@ var T = {
   pt:{
     tagline:"Canais, filmes e documentários — grátis e legais",
     channels:"Canais de Filme 24h", channelsSub:"programação gerada de filmes de domínio público",
-    live:"Ao Vivo", liveSub:"canais oficiais, gratuitos e legais",
+    live:"Ao Vivo", liveSub:"+100 canais oficiais de 15 países — use os filtros",
     lib:"Filmes", libSub:"acervo Internet Archive — domínio público",
     mine:"Meus canais", mineSub:"adicione qualquer URL .m3u8/.mp4 ou cole uma lista .m3u",
     favs:"Favoritos", gridAll:"Todos os filmes",
@@ -261,7 +268,7 @@ var T = {
   es:{
     tagline:"Canales, películas y documentales — gratis y legales",
     channels:"Canales de Cine 24h", channelsSub:"programación generada con películas de dominio público",
-    live:"En Vivo", liveSub:"canales oficiales, gratuitos y legales",
+    live:"En Vivo", liveSub:"+100 canales oficiales de 15 países — usa los filtros",
     lib:"Películas", libSub:"acervo Internet Archive — dominio público",
     mine:"Mis canales", mineSub:"agrega cualquier URL .m3u8/.mp4 o pega una lista .m3u",
     favs:"Favoritos", gridAll:"Todas las películas",
@@ -293,35 +300,144 @@ var hlsObj = null;
 var MOVIE_CHANNELS = [
   {id:"classicos", q:"collection:feature_films", color:"#e11d48", icon:"🎬",
    pt:"Clássicos do Cinema", es:"Clásicos del Cine"},
+  {id:"noir", q:'subject:"Film noir"', color:"#111827", icon:"🕵️",
+   pt:"Cinema Noir", es:"Cine Noir"},
+  {id:"faroeste", q:'subject:"Western films" OR subject:"Westerns"', color:"#b45309", icon:"🤠",
+   pt:"Faroeste", es:"Western"},
+  {id:"cult", q:'subject:"Cult films" OR subject:"B-movie"', color:"#7c3aed", icon:"🧟",
+   pt:"Cult & B-Movie", es:"Cult & Serie B"},
   {id:"scifi", q:"collection:SciFi_Horror", color:"#8b5cf6", icon:"👽",
    pt:"Sci-Fi & Terror", es:"Ciencia Ficción y Terror"},
   {id:"comedia", q:"collection:Comedy_Films", color:"#f59e0b", icon:"😂",
    pt:"Comédia", es:"Comedia"},
+  {id:"animacao", q:"collection:animationandcartoons", color:"#06b6d4", icon:"🧸",
+   pt:"Animação & Desenhos", es:"Animación & Dibujos"},
+  {id:"hispano", q:'subject:"Cine mexicano" OR subject:"Cine español" OR subject:"Spanish cinema"',
+   color:"#10b981", icon:"🎞️", pt:"Cine Hispano", es:"Cine Hispano"},
   {id:"mudo", q:"collection:silent_films", color:"#0ea5e9", icon:"📽️",
-   pt:"Cinema Mudo", es:"Cine Mudo"},
-  {id:"espanhol", q:'subject:"Spanish cinema" OR subject:"Spanish films" OR subject:"Cine español"',
-   color:"#10b981", icon:"🎞️", pt:"Cine Clásico ES", es:"Cine Clásico ES"}
+   pt:"Cinema Mudo", es:"Cine Mudo"}
 ];
 
-/* ---------- canais ao vivo OFICIAIS ---------- */
+/* ---------- canais ao vivo OFICIAIS (verificados por agentes/coleta em 2026-11-10) ---------- */
 var LIVE = [
-  {name:"TV Brasil", url:"https://tvbrasil-stream.ebc.com.br/index.m3u8", cat:"Público"},
-  {name:"Canal Gov", url:"https://canalgov-stream.ebc.com.br/index.m3u8", cat:"Público"},
-  {name:"Canal Educação", url:"https://canaleducacao-stream.ebc.com.br/index.m3u8", cat:"Público"},
-  {name:"Canal Libras", url:"https://canallibras-stream.ebc.com.br/mux_video_ts/index-1.m3u8", cat:"Público"},
-  {name:"TV Câmara", url:"https://stream3.camara.gov.br/tv1/manifest.m3u8", cat:"Público"},
-  {name:"TV Câmara 2", url:"https://stream3.camara.gov.br/tv2/manifest.m3u8", cat:"Público"},
-  {name:"TV Cultura", url:"https://player-tvcultura.stream.uol.com.br/live/tvcultura.m3u8", cat:"Público"},
-  {name:"Cultura Fast", url:"https://fpa-gateway.tvcultura.com.br:8181/memfs/606caef0-a290-413d-9f1f-8fcdb3a73831.m3u8", cat:"Público"},
-  {name:"TVE RS", url:"https://streaming.procergs.com.br:8443/tve/stve/playlist.m3u8", cat:"Público"},
-  {name:"TV UFOP", url:"https://app.tvufop.com.br/hls/tvufop.m3u8", cat:"Público"},
-  {name:"SESC TV", url:"https://slbps-ml-sambatech.akamaized.net/samba-live/2472/7424/8a00fe7cc36ac263b2c3e9324497d5ff/video/93a9920d-1b24-4c5e-a7d2-63d5489f59b5_index.m3u8", cat:"Cultura"},
-  {name:"Record News", url:"https://rnw-rn.otteravision.com/rnw/rn/rnw_rn.m3u8", cat:"Notícias"},
-  {name:"CNN Brasil", url:"https://d25usgadhphvwi.cloudfront.net/hls/main.m3u8", cat:"Notícias"},
-  {name:"Canal UOL", url:"https://video24.mais.uol.com.br/live/6146.m3u8", cat:"Notícias"},
-  {name:"ge FAST (Globo)", url:"https://dfr80qz435crc.cloudfront.net/EFGH/Amagi/Globo/GE_Fast_BR/GE_Fast.m3u8", cat:"Esportes"},
-  {name:"Amazon Sat", url:"https://amazonsat.brasilstream.com.br/hls/amazonsat/index.m3u8", cat:"Regional"},
-  {name:"Nuevo Tiempo (ES)", url:"https://stream.live.novotempo.com/tv/smil:tvnuevotiempo.smil/playlist.m3u8", cat:"Español"}
+  /* --- Brasil --- */
+  {name:"TV Brasil", url:"https://tvbrasil-stream.ebc.com.br/index.m3u8", cat:"Abertos", cc:"🇧🇷", lang:"PT"},
+  {name:"Canal Gov", url:"https://canalgov-stream.ebc.com.br/index.m3u8", cat:"Notícias", cc:"🇧🇷", lang:"PT"},
+  {name:"Canal Educação", url:"https://canaleducacao-stream.ebc.com.br/index.m3u8", cat:"Documentários", cc:"🇧🇷", lang:"PT"},
+  {name:"TV Câmara", url:"https://stream3.camara.gov.br/tv1/manifest.m3u8", cat:"Notícias", cc:"🇧🇷", lang:"PT"},
+  {name:"TV Câmara 2", url:"https://stream3.camara.gov.br/tv2/manifest.m3u8", cat:"Notícias", cc:"🇧🇷", lang:"PT"},
+  {name:"TV Cultura", url:"https://player-tvcultura.stream.uol.com.br/live/tvcultura.m3u8", cat:"Abertos", cc:"🇧🇷", lang:"PT"},
+  {name:"Cultura Fast", url:"https://fpa-gateway.tvcultura.com.br:8181/memfs/606caef0-a290-413d-9f1f-8fcdb3a73831.m3u8", cat:"Abertos", cc:"🇧🇷", lang:"PT"},
+  {name:"TVE RS", url:"https://streaming.procergs.com.br:8443/tve/stve/playlist.m3u8", cat:"Abertos", cc:"🇧🇷", lang:"PT"},
+  {name:"TV UFOP", url:"https://app.tvufop.com.br/hls/tvufop.m3u8", cat:"Abertos", cc:"🇧🇷", lang:"PT"},
+  {name:"SESC TV", url:"https://slbps-ml-sambatech.akamaized.net/samba-live/2472/7424/8a00fe7cc36ac263b2c3e9324497d5ff/video/93a9920d-1b24-4c5e-a7d2-63d5489f59b5_index.m3u8", cat:"Cultura", cc:"🇧🇷", lang:"PT"},
+  {name:"Record News", url:"https://rnw-rn.otteravision.com/rnw/rn/rnw_rn.m3u8", cat:"Notícias", cc:"🇧🇷", lang:"PT"},
+  {name:"CNN Brasil", url:"https://d25usgadhphvwi.cloudfront.net/hls/main.m3u8", cat:"Notícias", cc:"🇧🇷", lang:"PT"},
+  {name:"Canal UOL", url:"https://video24.mais.uol.com.br/live/6146.m3u8", cat:"Notícias", cc:"🇧🇷", lang:"PT"},
+  {name:"ge FAST (Globo)", url:"https://dfr80qz435crc.cloudfront.net/EFGH/Amagi/Globo/GE_Fast_BR/GE_Fast.m3u8", cat:"Esportes", cc:"🇧🇷", lang:"PT"},
+  {name:"Amazon Sat", url:"https://amazonsat.brasilstream.com.br/hls/amazonsat/index.m3u8", cat:"Abertos", cc:"🇧🇷", lang:"PT"},
+  {name:"Nuevo Tiempo (ES)", url:"https://stream.live.novotempo.com/tv/smil:tvnuevotiempo.smil/playlist.m3u8", cat:"Abertos", cc:"🇧🇷", lang:"ES"},
+  /* --- Portugal --- */
+  {name:"RTP 1", url:"https://streaming-live.rtp.pt/liverepeater/rtp1HD.smil/playlist.m3u8", cat:"Abertos", cc:"🇵🇹", lang:"PT"},
+  {name:"RTP 2", url:"https://streaming-live.rtp.pt/liverepeater/rtp2HD.smil/playlist.m3u8", cat:"Abertos", cc:"🇵🇹", lang:"PT"},
+  {name:"RTP Memória", url:"https://streaming-live.rtp.pt/liverepeater/smil:rtpmem.smil/playlist.m3u8", cat:"Abertos", cc:"🇵🇹", lang:"PT"},
+  {name:"RTP Açores", url:"https://streaming-live.rtp.pt/liverepeater/smil:rtpacores.smil/playlist.m3u8", cat:"Abertos", cc:"🇵🇹", lang:"PT"},
+  {name:"RTP Madeira", url:"https://streaming-live.rtp.pt/liverepeater/smil:rtpmadeira.smil/playlist.m3u8", cat:"Abertos", cc:"🇵🇹", lang:"PT"},
+  {name:"RTP África", url:"https://streaming-live.rtp.pt/liverepeater/smil:rtpafrica.smil/playlist.m3u8", cat:"Internacional", cc:"🇵🇹", lang:"PT"},
+  {name:"RTP Internacional", url:"https://streaming-live.rtp.pt/liverepeater/smil:rtpi.smil/playlist.m3u8", cat:"Internacional", cc:"🇵🇹", lang:"PT"},
+  {name:"RTP Notícias", url:"https://streaming-live.rtp.pt/livetvhlsDVR/rtpnHDdvr.smil/playlist.m3u8", cat:"Notícias", cc:"🇵🇹", lang:"PT"},
+  {name:"Porto Canal", url:"https://pull-live-156-1.global.ssl.fastly.net/pc5865dc25400thmb-ea6bf03b14fa318f7133/smil:pc1-jhrgyuoqe5865db-68tkgb14fa318f7133f03.smil/playlist.m3u8", cat:"Abertos", cc:"🇵🇹", lang:"PT"},
+  {name:"ARTV (Parlamento)", url:"https://playout172.livextend.cloud/liveiframe/_definst_/liveartvabr/playlist.m3u8", cat:"Notícias", cc:"🇵🇹", lang:"PT"},
+  /* --- Espanha --- */
+  {name:"La 1", url:"https://ztnr.rtve.es/ztnr/1688877.m3u8", cat:"Abertos", cc:"🇪🇸", lang:"ES"},
+  {name:"La 2", url:"https://rtvelivestream.rtve.es/rtvesec/la2/la2_main.m3u8", cat:"Abertos", cc:"🇪🇸", lang:"ES"},
+  {name:"24 Horas (RTVE)", url:"https://ztnr.rtve.es/ztnr/1694255.m3u8", cat:"Notícias", cc:"🇪🇸", lang:"ES"},
+  {name:"Clan (Infantil)", url:"https://lge-lgla2.otteravision.com/lge/lgcla/lgcla.m3u8", cat:"Infantil", cc:"🇪🇸", lang:"ES"},
+  {name:"Teledeporte", url:"https://rtve01p.origin.c21livecloud.com/live-origin/tdp-hls/bitrate_1.m3u8", cat:"Esportes", cc:"🇪🇸", lang:"ES"},
+  {name:"TVE Internacional Américas", url:"https://rtvelivestream-rtveplayplus.rtve.es/rtvesec/int/tvei_ame_main_1080.m3u8", cat:"Internacional", cc:"🇪🇸", lang:"ES"},
+  {name:"TVE Star", url:"https://rtvelivestream-rtveplayplus.rtve.es/rtvesec/int/star_main_1080.m3u8", cat:"Internacional", cc:"🇪🇸", lang:"ES"},
+  {name:"Radio 3 (RTVE)", url:"https://rtvelivestream.rtve.es/rtvesec/rne/rne3_main.m3u8", cat:"Música", cc:"🇪🇸", lang:"ES"},
+  {name:"3CatInfo", url:"https://directes-tv-int.3catdirectes.cat/live-origin/canal324-hls/master.m3u8", cat:"Notícias", cc:"🇪🇸", lang:"ES"},
+  {name:"Esport3 (int)", url:"https://directes-tv-int.3catdirectes.cat/live-content/esport3-hls/master.m3u8", cat:"Esportes", cc:"🇪🇸", lang:"ES"},
+  {name:"ETB1 On", url:"https://cdn1.etbon.eus/etb1on/index.m3u8", cat:"Abertos", cc:"🇪🇸", lang:"ES"},
+  {name:"ETB2 On", url:"https://cdn1.etbon.eus/etb2on/index.m3u8", cat:"Abertos", cc:"🇪🇸", lang:"ES"},
+  {name:"Telemadrid", url:"https://live.telemadrid.cross-media.es/6389770581112/eu-central-1/6416060453001/eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJob3N0IjoiajI5YjgyLmVncmVzcy5haGc3NmwiLCJhY2NvdW50X2lkIjoiNjQxNjA2MDQ1MzAwMSIsImVobiI6ImxpdmUudGVsZW1hZHJpZC5jcm9zcy1tZWRpYS5lcyIsImlzcyI6ImJsaXZlLXBsYXliYWNrLXNvdXJjZS1hcGkiLCJzdWIiOiJwYXRobWFwdG9rZW4iLCJhdWQiOlsiNjQxNjA2MDQ1MzAwMSJdLCJqdGkiOiI2Mzg5NzcwNTgxMTEyIn0.kqriAMUkHT6m0V6wkCHJum_EUyL4PAi1zJMKlfmYHEU/playlist-hls.m3u8", cat:"Abertos", cc:"🇪🇸", lang:"ES"},
+  {name:"Canal Sur Andalucía", url:"https://dfk2a268yviz9.cloudfront.net/v1/master/3722c60a815c199d9c0ef36c5b73da68a62b09d1/cc-ddiii1m6jt6of/CanalSurAndaluciaES.m3u8", cat:"Abertos", cc:"🇪🇸", lang:"ES"},
+  {name:"Canal Sur Notícias", url:"https://cdnlive.codev8.net/rtvalive/smil:channel42.smil/playlist.m3u8", cat:"Notícias", cc:"🇪🇸", lang:"ES"},
+  {name:"Galicia TV Europa", url:"https://crtvg-europa.flumotion.cloud/playlist.m3u8", cat:"Internacional", cc:"🇪🇸", lang:"ES"},
+  {name:"Aragón TV Internacional", url:"https://cartv.streaming.aranova.es/hls/live/aragontv_canal1.m3u8", cat:"Internacional", cc:"🇪🇸", lang:"ES"},
+  {name:"Televisión Canaria", url:"https://rtvclive.flumotion.cloud/rtvc1live/smil:channel1PRG.smil/playlist.m3u8", cat:"Abertos", cc:"🇪🇸", lang:"ES"},
+  {name:"CMM TV (C. La Mancha)", url:"https://cdnapisec.kaltura.com/p/2288691/sp/228869100/playManifest/entryId/1_gnz6ity9/protocol/https/format/applehttp/flavorIds/1_a9gxgxzy,1_v71ryg4b,1_vbfvtjw6,1_obo1bqsx,1_3shk3s5d/a.m3u8", cat:"Abertos", cc:"🇪🇸", lang:"ES"},
+  {name:"Real Madrid TV", url:"https://rmtv.akamaized.net/hls/live/2043153/rmtv-es-web/master.m3u8", cat:"Esportes", cc:"🇪🇸", lang:"ES"},
+  {name:"Sol Música", url:"https://d2glyu450vvghm.cloudfront.net/v1/master/3722c60a815c199d9c0ef36c5b73da68a62b09d1/cc-21u4g5cjglv02/sm.m3u8", cat:"Música", cc:"🇪🇸", lang:"ES"},
+  {name:"Anime Vision (ES)", url:"https://d1ujfw1zyymzyd.cloudfront.net/v1/master/3722c60a815c199d9c0ef36c5b73da68a62b09d1/cc-a6fukwkbxmex8/live/fast-channel-animevision-64527ec0/fast-channel-animevision-64527ec0.m3u8", cat:"Filmes", cc:"🇪🇸", lang:"ES"},
+  {name:"Anime Vision Classics", url:"https://d82pyvmcw2kdc.cloudfront.net/v1/master/3722c60a815c199d9c0ef36c5b73da68a62b09d1/cc-swfivzrzwamaq/live/fast-channel-animevisionclassics-efc8dc6d/fast-channel-animevisionclassics-efc8dc6d.m3u8", cat:"Filmes", cc:"🇪🇸", lang:"ES"},
+  {name:"Historia HD (ES)", url:"https://d1k3vzh2ivy22k.cloudfront.net/Historia1080.m3u8", cat:"Documentários", cc:"🇪🇸", lang:"ES"},
+  /* --- América Latina (verificado pelo agente) --- */
+  {name:"Radio TV Neuquén", url:"https://media.neuquen.gov.ar/rtn/television/playlist.m3u8", cat:"Abertos", cc:"🇦🇷", lang:"ES"},
+  {name:"Chaco TV", url:"https://wowzasrv.chaco.gov.ar/Streamtv/chacotv/playlist.m3u8", cat:"Abertos", cc:"🇦🇷", lang:"ES"},
+  {name:"Canal Once", url:"https://vivo.canaloncelive.tv/securepkgr3/oncemexico/playlist.m3u8", cat:"Abertos", cc:"🇲🇽", lang:"ES"},
+  {name:"Capital 21 (CDMX)", url:"https://video.cdmx.gob.mx/redes/stream.m3u8", cat:"Abertos", cc:"🇲🇽", lang:"ES"},
+  {name:"Justicia TV (SCJN)", url:"https://live-scjn.ovp-vivaro.digital/ovp-origin/638a22b47746d/playlist.m3u8", cat:"Notícias", cc:"🇲🇽", lang:"ES"},
+  {name:"Canal 15 ILCE", url:"https://live-ilce.ovp-vivaro.digital/ovp-origin-abr/ngrp:6359ef999f3fb_all/playlist.m3u8", cat:"Documentários", cc:"🇲🇽", lang:"ES"},
+  {name:"TV BUAP (Puebla)", url:"https://tvenvivo.buap.mx/livestream/stream/index.m3u8", cat:"Abertos", cc:"🇲🇽", lang:"ES"},
+  {name:"TV Senado Chile", url:"https://janus-tv-ply.senado.cl/playlist/playlist.m3u8", cat:"Notícias", cc:"🇨🇱", lang:"ES"},
+  {name:"U Los Lagos TV", url:"http://tv.ulagos.cl/web/live.m3u8", cat:"Abertos", cc:"🇨🇱", lang:"ES"},
+  {name:"Señal Colombia", url:"https://streaming.rtvc.gov.co/TV_Senal_Colombia_live/smil:live.smil/playlist.m3u8", cat:"Abertos", cc:"🇨🇴", lang:"ES"},
+  {name:"Canal Institucional (CO)", url:"https://streaming.rtvc.gov.co/TV_CanalInstitucional_live/smil:live.smil/playlist.m3u8", cat:"Notícias", cc:"🇨🇴", lang:"ES"},
+  {name:"Telesur", url:"https://mblesmain01.telesur.ultrabase.net/mbliveMain/hd/playlist.m3u8", cat:"Internacional", cc:"🇻🇪", lang:"ES"},
+  {name:"TV Legislativa (EC)", url:"https://streamingav.asambleanacional.gob.ec/hls/stream.m3u8", cat:"Notícias", cc:"🇪🇨", lang:"ES"},
+  {name:"Educa TV (EC)", url:"https://avm.ecuamedia.net/educatv/live/playlist.m3u8", cat:"Documentários", cc:"🇪🇨", lang:"ES"},
+  {name:"UPEA TV (Bolívia)", url:"https://tvstream.upea.bo/hls/oSs0jSWumTFIIVY97559.m3u8", cat:"Abertos", cc:"🇧🇴", lang:"ES"},
+  {name:"Paraguay TV", url:"https://stream.paraguaytv.gov.py/memfs/bbe36fed-9b49-4d1d-adaa-4bd6d1b2e386.m3u8", cat:"Abertos", cc:"🇵🇾", lang:"ES"},
+  {name:"Quince UCR (Costa Rica)", url:"https://wowza.ucr.ac.cr/quinceucr/_definst_/quinceucr.stream/playlist.m3u8", cat:"Abertos", cc:"🇨🇷", lang:"ES"},
+  {name:"Canal 4 RD (CERTV)", url:"https://cdn.protvradiostream.com/canal4rd-1/ngrp:canal4rd-1_all/playlist.m3u8", cat:"Abertos", cc:"🇩🇴", lang:"ES"},
+  {name:"Canal 17 RTVD", url:"https://cdn.protvradiostream.com/rtvd17/ngrp:rtvd17_all/playlist.m3u8", cat:"Abertos", cc:"🇩🇴", lang:"ES"},
+  /* --- Canais lineares de FILME (FAST oficiais) --- */
+  {name:"Cine Friki", url:"https://d2mr4fu91mjx9m.cloudfront.net/v1/master/3722c60a815c199d9c0ef36c5b73da68a62b09d1/cc-rb0tx75ojbc5u/CineFriki_ES.m3u8", cat:"Filmes", cc:"🇪🇸", lang:"ES"},
+  {name:"Cine Western", url:"https://d2nq34q0i1r3la.cloudfront.net/v1/master/3722c60a815c199d9c0ef36c5b73da68a62b09d1/cc-awohw8g217ho8/CineWestern_ES.m3u8", cat:"Filmes", cc:"🇪🇸", lang:"ES"},
+  {name:"Cine Romántico", url:"https://d1si3n1st4nkgb.cloudfront.net/10502/88886011/hls/master.m3u8?ads.xumo_channelId=88886011", cat:"Filmes", cc:"🇪🇸", lang:"ES"},
+  {name:"Popcorn Central", url:"https://oly-ftvpc.otteravision.com/oly/ftvpc/ftvpc.m3u8", cat:"Filmes", cc:"🇺🇸", lang:"ES"},
+  {name:"CINDIE TV", url:"https://cc-hqw8u5r1nshjc.akamaized.net/scheduler/scheduleMaster/352.m3u8", cat:"Filmes", cc:"🇧🇷", lang:"PT"},
+  /* --- Documentários --- */
+  {name:"WildEarth", url:"https://dqga3jatxofgx.cloudfront.net/WildEarth.m3u8", cat:"Documentários", cc:"🇿🇦", lang:"EN"},
+  {name:"Terra Mater WILD", url:"https://53ff3982.wurl.com/master/f36d25e7e52f1ba8d7e56eb859c636563214f541/UmxheHhUVi1ldV9UZXJyYU1hdGVyV2lsZF9ITFM/playlist.m3u8", cat:"Documentários", cc:"🇦🇹", lang:"EN"},
+  {name:"WaterBear", url:"https://amg01415-waterbearnetwor-waterbear-samsunguk-1h0y8.amagi.tv/playlist/amg01415-waterbearnetwor-waterbear-samsunguk/playlist.m3u8", cat:"Documentários", cc:"🇬🇧", lang:"EN"},
+  {name:"Docurama", url:"https://docurama-plex-ingest.cinedigm.com/playlist.m3u8", cat:"Documentários", cc:"🇺🇸", lang:"EN"},
+  {name:"Documentary+", url:"https://ef79b15c8c7c46c7a9de9d33001dbd07.mediatailor.us-west-2.amazonaws.com/v1/master/ba62fe743df0fe93366eba3a257d792884136c7f/LINEAR-859-DOCUMENTARYPLUS-DOCUMENTARYPLUS/mt/documentaryplus/859/hls/master/playlist.m3u8", cat:"Documentários", cc:"🇺🇸", lang:"EN"},
+  {name:"Get.factual", url:"https://d1nhni5l2n8hjt.cloudfront.net/gf.m3u8", cat:"Documentários", cc:"🇩🇪", lang:"EN"},
+  {name:"Danger TV", url:"https://dk0n7jh428tzj.cloudfront.net/v1/dangertv/samsungheadend_us/latest/main/hls/playlist.m3u8", cat:"Documentários", cc:"🇺🇸", lang:"EN"},
+  {name:"Curiosity NOW", url:"https://amg00170-amg00170c4-samsung-gb-4232.playouts.now.amagi.tv/playlist.m3u8", cat:"Documentários", cc:"🇬🇧", lang:"EN"},
+  {name:"Adventure Earth", url:"https://a57e9c69976649b582a8d7604c00e69a.mediatailor.us-east-1.amazonaws.com/v1/master/44f73ba4d03e9607dcd9bebdcb8494d86964f1d8/RlaxxTV-eu_AdventureEarth/playlist.m3u8", cat:"Documentários", cc:"🇩🇪", lang:"EN"},
+  {name:"Autentic History", url:"https://9e754fa707344ccca6d84955c8fcaf36.mediatailor.us-east-1.amazonaws.com/v1/master/44f73ba4d03e9607dcd9bebdcb8494d86964f1d8/RlaxxTV-eu_AutenticHistory/playlist.m3u8", cat:"Documentários", cc:"🇩🇪", lang:"EN"},
+  {name:"The Explorers", url:"https://sofast-yupptv.vgcdn.net/v1/master/611d79b11b77e2f571934fd80ca1413453772ac7/4804aca3-dd54-43d1-8caa-0b836a76d9e9/manifest.m3u8", cat:"Documentários", cc:"🇫🇷", lang:"EN"},
+  /* --- Música --- */
+  {name:"California Music Channel", url:"https://cmc-cmctv-cineverse.amagi.tv/playlist.m3u8", cat:"Música", cc:"🇺🇸", lang:"EN"},
+  {name:"Qwest TV Jazz", url:"https://samsungau-qwestjazz-samsungtv-zw2jc.amagi.tv/playlist/samsungau-qwestjazz-samsungtv/playlist.m3u8", cat:"Música", cc:"🇫🇷", lang:"EN"},
+  {name:"Qello Concerts", url:"https://lotus.stingray.com/manifest/qello-qello001-montreal/samsungtvplus/master.m3u8", cat:"Música", cc:"🇨🇦", lang:"EN"},
+  {name:"Now 70s", url:"https://lightningnow70-samsungau.amagi.tv/playlist.m3u8", cat:"Música", cc:"🇬🇧", lang:"EN"},
+  {name:"Now 80s", url:"https://lightningnow80-samsungau.amagi.tv/playlist.m3u8", cat:"Música", cc:"🇬🇧", lang:"EN"},
+  {name:"NOW Rock", url:"https://lightning-now90s-samsungnz.amagi.tv/playlist.m3u8", cat:"Música", cc:"🇬🇧", lang:"EN"},
+  {name:"Clubbing TV", url:"https://d1j2csarxnwazk.cloudfront.net/v1/master/3722c60a815c199d9c0ef36c5b73da68a62b09d1/cc-uze1m6xh4fiyr-ssai-prd/master.m3u8", cat:"Música", cc:"🇫🇷", lang:"EN"},
+  {name:"Deluxe Music", url:"https://sdn-global-live-streaming-packager-cache.3qsdn.com/13456/13456_264_live.m3u8", cat:"Música", cc:"🇩🇪", lang:"EN"},
+  {name:"Deluxe Dance", url:"https://sdn-global-live-streaming-packager-cache.3qsdn.com/64733/64733_264_live.m3u8", cat:"Música", cc:"🇩🇪", lang:"EN"},
+  {name:"Deluxe Rap", url:"https://sdn-global-live-streaming-packager-cache.3qsdn.com/65183/65183_264_live.m3u8", cat:"Música", cc:"🇩🇪", lang:"EN"},
+  {name:"Magenta Musik 360", url:"https://streaming.magentamusik.de/csm/573870/magentamusik1/index.m3u8", cat:"Música", cc:"🇩🇪", lang:"EN"},
+  {name:"TikTok Radio Brasil", url:"https://d1bl6tskrpq9ze.cloudfront.net/hls/master.m3u8?ads.xumo_channelId=99992529", cat:"Música", cc:"🇧🇷", lang:"PT"},
+  /* --- Infantil --- */
+  {name:"Baby Shark TV", url:"https://newidco-babysharktv-1-us.roku.wurl.tv/playlist.m3u8", cat:"Infantil", cc:"🇺🇸", lang:"EN"},
+  {name:"Super Simple Songs", url:"https://janson-supersimplesongs-1-us.roku.wurl.tv/playlist.m3u8", cat:"Infantil", cc:"🇺🇸", lang:"EN"},
+  {name:"ToonGoggles", url:"https://amg01329-otterainc-toongoggles-samsungau-ad-4c.amagi.tv/playlist/amg01329-otterainc-toongoggles-samsungau/playlist.m3u8", cat:"Infantil", cc:"🇺🇸", lang:"EN"},
+  {name:"PBS Kids", url:"https://livestream.pbskids.org/out/v1/14507d931bbe48a69287e4850e53443c/est.m3u8", cat:"Infantil", cc:"🇺🇸", lang:"EN"},
+  {name:"Ryan and Friends", url:"https://ryanandfriends-samsungau.amagi.tv/playlist.m3u8", cat:"Infantil", cc:"🇺🇸", lang:"EN"},
+  {name:"Tiny Pop", url:"https://amg01753-narrativeuk-amg01753c1-lg-gb-1830.playouts.now.amagi.tv/playlist/amg01753-narrativeuk-tinypop-lggb/playlist.m3u8", cat:"Infantil", cc:"🇬🇧", lang:"EN"},
+  {name:"The Jungle Book", url:"https://cc-4bhi5osabejc9.akamaized.net/v1/master/3722c60a815c199d9c0ef36c5b73da68a62b09d1/cc-4bhi5osabejc9/junglebook.m3u8", cat:"Infantil", cc:"🇺🇸", lang:"EN"},
+  {name:"13 Kids (Chile)", url:"https://origin.dpsgo.com/ssai/event/LhHrVtyeQkKZ-Ye_xEU75g/master.m3u8", cat:"Infantil", cc:"🇨🇱", lang:"ES"},
+  {name:"pocket.watch", url:"https://dl74gpgmnb7i8.cloudfront.net/pocketwatch_GameOn.m3u8", cat:"Infantil", cc:"🇺🇸", lang:"EN"},
+  {name:"Smurf TV", url:"https://stream.ads.ottera.tv/playlist.m3u8?network_id=4065", cat:"Infantil", cc:"🇺🇸", lang:"EN"},
+  /* --- Notícias internacionais --- */
+  {name:"DW Español", url:"https://dwamdstream104.akamaized.net/hls/live/2015530/dwstream104/master.m3u8", cat:"Notícias", cc:"🇩🇪", lang:"ES"},
+  {name:"France 24 Español", url:"https://live.france24.com/hls/live/2037220-b/F24_ES_HI_HLS/master_5000.m3u8", cat:"Notícias", cc:"🇫🇷", lang:"ES"}
 ];
 
 /* ---------- helpers ---------- */
@@ -496,7 +612,7 @@ function playMovie(item, ch){
 }
 function playLive(lc){
   playerCtx = {kind:"live", lc:lc};
-  playUrl(lc.url, lc.name, lc.cat + " • " + t("live"));
+  playUrl(lc.url, lc.name, (lc.cc||"")+" • "+catLabel(lc.cat)+" • "+t("live"));
   updatePFav();
 }
 function playMine(mc){
@@ -550,13 +666,35 @@ function renderChannels(){
   });
 }
 
+var liveFilter = "Todos";
+var CATS = ["Todos","Abertos","Filmes","Notícias","Documentários","Música","Infantil","Esportes","Internacional","Cultura"];
+var CAT_LABEL = {
+  pt:{Todos:"Todos",Abertos:"Abertos",Filmes:"Filmes",Notícias:"Notícias",Documentários:"Documentários",Música:"Música",Infantil:"Infantil",Esportes:"Esportes",Internacional:"Internacional",Cultura:"Cultura"},
+  es:{Todos:"Todos",Abertos:"Abiertos",Filmes:"Películas",Notícias:"Noticias",Documentários:"Documentales",Música:"Música",Infantil:"Infantil",Esportes:"Deportes",Internacional:"Internacional",Cultura:"Cultura"}
+};
+function catLabel(c){ return (CAT_LABEL[lang]||CAT_LABEL.pt)[c]||c; }
+function renderChips(){
+  var box=$("#chips-live"); box.innerHTML="";
+  CATS.forEach(function(c){
+    var n=LIVE.filter(function(l){ return l.cat===c; }).length;
+    if(c!=="Todos" && n===0) return;
+    var b=document.createElement("button");
+    b.className="chip"+(liveFilter===c?" on":"");
+    b.setAttribute("data-fk",""); b.tabIndex=0;
+    b.textContent = c==="Todos" ? catLabel(c)+" ("+LIVE.length+")" : catLabel(c)+" ("+n+")";
+    b.addEventListener("keydown", onCardKey);
+    b.addEventListener("click", function(){ liveFilter=c; renderChips(); renderLive(); });
+    box.appendChild(b);
+  });
+}
 function renderLive(){
   var row=$("#row-live"); row.innerHTML="";
   LIVE.forEach(function(lc){
+    if(liveFilter!=="Todos" && lc.cat!==liveFilter) return;
     var el=document.createElement("div");
     el.className="card"; el.setAttribute("data-fk",""); el.tabIndex=0;
-    el.innerHTML='<div class="ico">📺</div><h4>'+esc(lc.name)+'</h4>'+
-      '<div class="meta">'+esc(lc.cat)+'</div>'+
+    el.innerHTML='<div class="ico">'+(lc.cc||"📺")+'</div><h4>'+esc(lc.name)+'</h4>'+
+      '<div class="meta">'+esc(catLabel(lc.cat))+' • '+esc(lc.lang||"")+'</div>'+
       '<div class="now">● <b>'+t("live")+'</b></div>';
     el.addEventListener("keydown", onCardKey);
     el.addEventListener("click", function(){ playLive(lc); });
@@ -815,6 +953,7 @@ function applyI18n(){
 /* ---------- boot ---------- */
 applyI18n();
 renderChannels();
+renderChips();
 renderLive();
 renderLibrary();
 renderMine();
