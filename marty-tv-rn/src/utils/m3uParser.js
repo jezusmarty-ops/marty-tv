@@ -87,6 +87,23 @@ function hostAllowed(url, allowlist) {
 }
 
 /**
+ * Compara o idioma do canal com o idioma desejado.
+ * Aceita códigos (pt, es) e palavras (portuguese, spanish, español...).
+ * Idioma desconhecido é ACEITO (as listas por idioma já vêm filtradas).
+ */
+function languageMatches(value, wanted) {
+  if (!wanted || wanted === 'all') return true;
+  if (!value) return true;
+  const v = String(value).toLowerCase();
+  const patterns = {
+    pt: ['pt', 'por', 'portuguese', 'português', 'portugues', 'brazil', 'brasil'],
+    es: ['es', 'spa', 'spanish', 'español', 'espanol', 'castellano'],
+  };
+  const list = patterns[wanted] || [wanted];
+  return list.some(p => v === p || v.startsWith(p) || v.includes(p));
+}
+
+/**
  * Faz o parse de um texto M3U.
  *
  * @param {string} text conteúdo da lista
@@ -146,10 +163,8 @@ export function parseM3U(text, opts = {}) {
         const url = line;
         current.url = url;
         if (/^https?:\/\/.+/i.test(url) && !seenUrls.has(url)) {
-          // filtro de idioma
-          const langOk =
-            language === 'all' ||
-            (current.language && current.language.toLowerCase().startsWith(language));
+          // filtro de idioma (aceita código e nome por extenso)
+          const langOk = languageMatches(current.language, language);
           // filtro legal + filtro custom
           const hostOk = hostAllowed(url, allowlist);
           const customOk = customFilter ? customFilter(current) : true;
