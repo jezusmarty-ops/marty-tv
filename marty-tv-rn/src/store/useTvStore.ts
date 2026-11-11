@@ -6,6 +6,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SOURCES, OFFICIAL_DOMAINS } from '../config/sources';
+import { BUILTIN_CHANNELS } from '../config/builtinChannels';
 import { parseM3U, buildSections } from '../utils/m3uParser';
 import { fetchTextWithRetry, downloadTextWithRNFS } from '../utils/fetcher';
 
@@ -96,18 +97,33 @@ export const useTvStore = create<TvState>()(
           }
         }
 
-        if (all.length === 0) {
-          set({
-            status: 'error',
-            warnings: warnings.length ? warnings : ['Nenhuma fonte retornou conteúdo.'],
-          });
-          return;
+        // Mescla: canais das listas públicas + catálogo embutido oficial.
+        // O catálogo embutido garante interface SEMPRE populada (nunca tela vazia).
+        const merged: Channel[] = [];
+        const seenUrls = new Set<string>();
+        for (const ch of all) {
+          if (!ch.url || seenUrls.has(ch.url)) continue;
+          seenUrls.add(ch.url);
+          merged.push(ch);
         }
+        BUILTIN_CHANNELS.forEach((b, i) => {
+          if (seenUrls.has(b.url)) return;
+          seenUrls.add(b.url);
+          merged.push({
+            id: `builtin-${i}`,
+            name: b.name,
+            logo: null,
+            group: b.group,
+            language: b.language,
+            url: b.url,
+            sourceId: 'builtin',
+          });
+        });
 
         set({
           status: 'ready',
-          channels: all,
-          sections: buildSections(all, 1),
+          channels: merged,
+          sections: buildSections(merged, 1),
           warnings,
         });
       },
