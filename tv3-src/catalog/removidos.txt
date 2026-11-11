@@ -1,0 +1,6 @@
+# Canais tirados à mão depois da revisão (um id do iptv-org por linha).
+# Motivo: canal pago ou link que parece retransmissão não oficial.
+LasEstrellas.mx
+LasEstrellasLatinAmerica.mx
+MegaExtrenoHD.us
+AneflixLive.us

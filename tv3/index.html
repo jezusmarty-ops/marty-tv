@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Marty TV</title>
+  <meta name="theme-color" content="#07080d" />
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body>
+  <div id="splash">
+    <div>
+      <div class="brand-mark">M</div>
+      <div class="msg" id="splash-msg">Carregando canais…</div>
+      <div class="bar"><i></i></div>
+    </div>
+  </div>
+
+  <nav id="rail"></nav>
+  <main id="main">
+    <div id="scroller"><div id="content"></div></div>
+  </main>
+  <div class="clock" id="clock"></div>
+  <div class="kids-flag hidden" id="kids-flag"></div>
+  <div id="modal-root"></div>
+  <div id="toast"></div>
+
+  <!-- catálogo embutido (usado quando não há internet ou na 1ª abertura) -->
+  <script src="catalog.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
