@@ -18,8 +18,8 @@ android {
         applicationId "com.martytv"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 3
-        versionName "2.0.2"
+        versionCode 4
+        versionName "2.0.3"
     }
     signingConfigs {
         debug {
