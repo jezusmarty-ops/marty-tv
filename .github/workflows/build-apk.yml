@@ -1,0 +1,78 @@
+# ============================================================
+# WORKFLOW PARA O RAIZ DO REPOSITÓRIO jezusmarty-ops/marty-tv
+# (o GitHub Actions só enxerga workflows em .github/workflows na
+#  raiz do repo — este arquivo deve ir para:
+#  .github/workflows/build-apk.yml  do repositório)
+#
+# O projeto React Native vive na pasta marty-tv-rn/ do mesmo repo.
+# ============================================================
+name: Build APK (Release)
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'marty-tv-rn/**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Instalar dependências npm
+        working-directory: marty-tv-rn
+        run: npm install --legacy-peer-deps
+
+      - name: Configurar JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Configurar Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Aceitar licenças e instalar plataforma
+        run: |
+          yes | sdkmanager --licenses > /dev/null || true
+          sdkmanager "platforms;android-34" "build-tools;34.0.0" "platform-tools"
+
+      - name: Configurar Gradle 8.6
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.6'
+
+      - name: Gerar keystore de assinatura (debug)
+        run: |
+          keytool -genkeypair -v \
+            -keystore marty-tv-rn/android/app/debug.keystore \
+            -storepass android \
+            -alias androiddebugkey \
+            -keypass android \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US" \
+            -storetype JKS
+
+      - name: Gerar gradle wrapper (se ausente)
+        working-directory: marty-tv-rn/android
+        run: |
+          if [ ! -f gradlew ]; then gradle wrapper --gradle-version 8.6; fi
+          chmod +x gradlew
+
+      - name: Compilar APK release
+        working-directory: marty-tv-rn/android
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Publicar APK nos Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: MartyTV-app-release
+          path: marty-tv-rn/android/app/build/outputs/apk/release/app-release.apk
