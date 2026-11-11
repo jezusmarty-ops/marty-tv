@@ -11,6 +11,7 @@ import { StatusBar, View, StyleSheet } from 'react-native';
 import { FocusProvider } from './src/navigation/focusManager';
 import { useTvStore } from './src/store/useTvStore';
 import Sidebar from './src/components/Sidebar';
+import ErrorBoundary from './src/components/ErrorBoundary';
 import HomeScreen from './src/screens/HomeScreen';
 import CategoryScreen from './src/screens/CategoryScreen';
 import FavoritesScreen from './src/screens/FavoritesScreen';
@@ -52,7 +53,11 @@ function Root() {
 }
 
 export default function App() {
-  return <Root />;
+  return (
+    <ErrorBoundary>
+      <Root />
+    </ErrorBoundary>
+  );
 }
 
 const styles = StyleSheet.create({
