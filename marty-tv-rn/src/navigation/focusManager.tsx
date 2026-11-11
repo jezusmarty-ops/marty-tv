@@ -1,10 +1,12 @@
 /**
- * Gerenciador de foco espacial para Android TV (D-Pad).
+ * Gerenciador de foco espacial para Android TV / TV Box (D-Pad).
  *
- * Sem dependências externas: registra refs de elementos focáveis e, ao
- * receber eventos de seta do controle remoto, calcula o "vizinho mais
- * próximo" (por distância geométrica) e move o foco — exatamente como
- * funciona a Leanback UI nativa.
+ * BLINDADO para Android AOSP (como Aquario):
+ *  - O módulo TVEventHandler é carregado em tempo de execução (require tardio)
+ *    e protegido por try/catch — em builds onde ele não existe, o app NÃO crasheia;
+ *  - Cada chamada de foco é protegida (requestTVFocus pode não existir);
+ *  - Se não houver TVEventHandler, o app segue com a navegação nativa do Android
+ *    (setas movem entre views focáveis) e com o toque/OK funcionando.
  */
 import React, {
   createContext,
@@ -12,14 +14,8 @@ import React, {
   useContext,
   useEffect,
   useRef,
-  useState,
 } from 'react';
-import {
-  TVEventHandler,
-  View,
-  type ViewProps,
-  type LayoutChangeEvent,
-} from 'react-native';
+import { View, type ViewProps, type LayoutChangeEvent } from 'react-native';
 
 interface FocusNode {
   id: string;
@@ -30,8 +26,34 @@ interface FocusNode {
 const registry = new Map<string, FocusNode>();
 let lastFocusedId: string | null = null;
 
-/** Direções suportadas */
 type Direction = 'up' | 'down' | 'left' | 'right';
+
+/** Pede foco de forma segura (não existe em todos os builds/hardwares) */
+function safeRequestFocus(node?: FocusNode | null) {
+  try {
+    const el = node && node.ref.current;
+    if (el && typeof (el as any).requestTVFocus === 'function') {
+      (el as any).requestTVFocus();
+    }
+  } catch {
+    /* sem suporte a foco programático: ignora */
+  }
+}
+
+/** Carrega o TVEventHandler com proteção total */
+function getTVEventHandlerClass(): any | null {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const rn = require('react-native');
+    const candidates = [rn.TVEventHandler, rn.default && rn.default.TVEventHandler];
+    for (const T of candidates) {
+      if (typeof T === 'function') return T;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 function register(node: FocusNode) {
   registry.set(node.id, node);
@@ -52,7 +74,6 @@ function distance(
   const by = b.y + b.h / 2;
   const dx = bx - ax;
   const dy = by - ay;
-  // elemento precisa estar na direção do movimento
   if (dir === 'right' && dx <= 0) return Infinity;
   if (dir === 'left' && dx >= 0) return Infinity;
   if (dir === 'down' && dy <= 0) return Infinity;
@@ -68,23 +89,24 @@ async function moveFocus(dir: Direction) {
   if (nodes.length === 0) return;
 
   if (!current || !current.layout) {
-    // sem foco ativo: foca o primeiro elemento registrado
-    nodes[0].ref.current?.requestTVFocus();
+    safeRequestFocus(nodes[0]);
     return;
   }
 
-  // garante layouts medidos (measureInWindow é async)
   await Promise.all(
     nodes
       .filter(n => !n.layout)
       .map(
         n =>
           new Promise<void>(resolve => {
-            n.ref.current?.measureInWindow((x, y, w, h) => {
-              n.layout = { x, y, w, h };
+            try {
+              n.ref.current?.measureInWindow((x, y, w, h) => {
+                n.layout = { x, y, w, h };
+                resolve();
+              });
+            } catch {
               resolve();
-            });
-            // fallback caso a medida falhe
+            }
             setTimeout(resolve, 120);
           }),
       ),
@@ -93,7 +115,7 @@ async function moveFocus(dir: Direction) {
   let best: FocusNode | null = null;
   let bestDist = Infinity;
   for (const n of nodes) {
-    if (n.id === current.id || !n.layout) continue;
+    if (n.id === current.id || !n.layout || !current.layout) continue;
     const d = distance(current.layout, n.layout, dir);
     if (d < bestDist) {
       bestDist = d;
@@ -101,7 +123,7 @@ async function moveFocus(dir: Direction) {
     }
   }
   if (best && bestDist < Infinity) {
-    best.ref.current?.requestTVFocus();
+    safeRequestFocus(best);
   }
 }
 
@@ -114,11 +136,6 @@ interface FocusApi {
   focusProps: ViewProps & { ref: React.RefObject<View> };
 }
 
-/**
- * Hook: registra o componente no mapa de foco espacial.
- * @param id identificador único do foco
- * @param opts.hasTVPreferredFocus foca este elemento ao montar
- */
 export function useFocusable(id: string, opts: { hasTVPreferredFocus?: boolean } = {}): FocusApi {
   const ref = useRef<View>(null);
 
@@ -126,8 +143,7 @@ export function useFocusable(id: string, opts: { hasTVPreferredFocus?: boolean }
     const node: FocusNode = { id, ref, layout: null };
     register(node);
     if (opts.hasTVPreferredFocus) {
-      // espera o layout antes de pedir foco
-      const t = setTimeout(() => ref.current?.requestTVFocus(), 50);
+      const t = setTimeout(() => safeRequestFocus(node), 60);
       return () => {
         clearTimeout(t);
         unregister(id);
@@ -150,10 +166,6 @@ export function useFocusable(id: string, opts: { hasTVPreferredFocus?: boolean }
   return { ref, focusable: true, onFocus, onLayout, hasTVPreferredFocus: opts.hasTVPreferredFocus };
 }
 
-/**
- * Provider raiz: instala o TVEventHandler que traduz setas do D-Pad em
- * movimentos de foco espacial. Botão voltar (BACK) é repassado por callback.
- */
 const FocusContext = createContext<{ move: (d: Direction) => void }>({ move: () => {} });
 
 export function FocusProvider({
@@ -165,45 +177,65 @@ export function FocusProvider({
   onBack?: () => void;
   onMenu?: () => void;
 }) {
-  const [ready, setReady] = useState(false);
   const backRef = useRef(onBack);
   const menuRef = useRef(onMenu);
   backRef.current = onBack;
   menuRef.current = onMenu;
 
   useEffect(() => {
-    const handler = new TVEventHandler();
-    handler.enable(null, (_cmp, evt) => {
-      switch (evt && evt.eventType) {
-        case 'up':
-          moveFocus('up');
-          break;
-        case 'down':
-          moveFocus('down');
-          break;
-        case 'left':
-          moveFocus('left');
-          break;
-        case 'right':
-          moveFocus('right');
-          break;
-        case 'back':
-          backRef.current?.();
-          break;
-        case 'menu':
-          menuRef.current?.();
-          break;
-        default:
-          break;
+    let handler: any = null;
+    const T = getTVEventHandlerClass();
+    if (!T) {
+      // Sem suporte a eventos de TV (ex.: box AOSP): segue sem crash.
+      return;
+    }
+    try {
+      handler = new T();
+      handler.enable(null, (_cmp: any, evt: any) => {
+        const type = evt && evt.eventType;
+        switch (type) {
+          case 'up':
+            moveFocus('up');
+            break;
+          case 'down':
+            moveFocus('down');
+            break;
+          case 'left':
+            moveFocus('left');
+            break;
+          case 'right':
+            moveFocus('right');
+            break;
+          case 'back':
+            backRef.current && backRef.current();
+            break;
+          case 'menu':
+            menuRef.current && menuRef.current();
+            break;
+          default:
+            break;
+        }
+      });
+    } catch {
+      try {
+        if (handler && typeof handler.disable === 'function') handler.disable();
+      } catch {
+        /* ignora */
       }
-    });
-    setReady(true);
+      handler = null;
+    }
     return () => {
-      handler.disable();
+      try {
+        if (handler && typeof handler.disable === 'function') handler.disable();
+      } catch {
+        /* ignora */
+      }
     };
   }, []);
 
-  return <FocusContext.Provider value={{ move: moveFocus }}>{children}</FocusContext.Provider>;
+  return (
+    <FocusContext.Provider value={{ move: moveFocus }}>{children}</FocusContext.Provider>
+  );
 }
 
 export function useFocusDirection() {
