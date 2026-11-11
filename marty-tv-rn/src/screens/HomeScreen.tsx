@@ -2,8 +2,8 @@
  * Tela inicial — Hero em autoplay + trilhas por categoria.
  */
 import React, { useMemo } from 'react';
-import { View, ScrollView, StyleSheet } from 'react-native';
-import { colors } from '../theme/theme';
+import { View, Text, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
+import { colors, spacing, fontSize } from '../theme/theme';
 import HeroBanner from '../components/HeroBanner';
 import Carousel from '../components/Carousel';
 import ErrorScreen from '../components/ErrorScreen';
@@ -23,6 +23,18 @@ export default function HomeScreen() {
     const list = movies && movies.data.length ? movies.data : channels;
     return list.length ? list[0] : null;
   }, [sections, channels]);
+
+  if (status === 'loading' && channels.length === 0) {
+    return (
+      <View style={styles.loading}>
+        <Text style={styles.loadingBrand}>
+          Marty<Text style={styles.loadingAccent}>TV</Text>
+        </Text>
+        <ActivityIndicator size="large" color={colors.crimson} />
+        <Text style={styles.loadingText}>Carregando canais…</Text>
+      </View>
+    );
+  }
 
   if (status === 'error') {
     return (
@@ -49,12 +61,9 @@ export default function HomeScreen() {
           />
         ))}
         {warnings.length > 0 && (
-          <ErrorScreen
-            title="Algumas fontes falharam"
-            warnings={warnings}
-            onRetry={loadCatalog}
-            onBack={() => {}}
-          />
+          <Text style={styles.warnNote}>
+            Algunas fuentes no respondieron — mostrando el catálogo interno.
+          </Text>
         )}
       </ScrollView>
     </View>
@@ -64,4 +73,28 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   content: { paddingTop: 24, paddingBottom: 60 },
+  loading: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.bg,
+  },
+  loadingBrand: {
+    color: colors.text,
+    fontSize: 44,
+    fontWeight: '800',
+    marginBottom: spacing.lg,
+  },
+  loadingAccent: { color: colors.crimson },
+  loadingText: {
+    color: colors.muted,
+    fontSize: fontSize.body,
+    marginTop: spacing.md,
+  },
+  warnNote: {
+    color: colors.muted,
+    fontSize: 12,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.md,
+  },
 });
