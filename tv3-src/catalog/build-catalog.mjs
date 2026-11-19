@@ -161,9 +161,13 @@ async function main() {
     const pt = L.has('por'), es = L.has('spa');
     if (!(pt || es || LUSO_HISP.has(c.country))) continue;
     if (c.country === 'US' && !es && !pt) continue;
-    if (PAGOS.test(c.name) || (c.alt_names || []).some(a => PAGOS.test(a))) continue;
+    // Canais FAST oficiais do Pluto TV Brasil (Nick, MTV, Comedy Central…) são do próprio
+    // dono dos direitos (Paramount): a regra de "nome de canal pago" não vale para eles.
+    // (no iptv-org eles aparecem como país "US", mas com áudio em português = grade do Brasil)
+    const plutoBR = (c.country === 'BR' || pt) && /(^|\/\/)(jmp2\.uk\/plu-|[^/]*pluto\.tv\/)/i.test(s.url);
+    if (!plutoBR && (PAGOS.test(c.name) || (c.alt_names || []).some(a => PAGOS.test(a)))) continue;
     // versões de outros países (ex.: "Rakuten TV ... Germany") costumam vir em outro idioma
-    const OUTRO_PAIS = /\b(germany|deutschland|italy|italia|france|uk|nederland|polska|australia|au|nordic)\s*(\(\d+p\))?\s*(\[[^\]]*\])?\s*$/i;
+    const OUTRO_PAIS = /\b(germany|deutschland|italy|italia|france|uk|nederland|polska|australia|au|nordic|finland|suomi|sweden|norway|danmark)\s*(\(\d+p\))?\s*(\[[^\]]*\])?\s*$/i;
     if (OUTRO_PAIS.test(c.name) || OUTRO_PAIS.test(s.title || '')) continue;
     const cats = c.categories || [];
     if (cats.includes('shop') || cats.includes('xxx')) continue;
@@ -173,7 +177,10 @@ async function main() {
     try { host = new URL(s.url).hostname; } catch { continue; }
     if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.startsWith('[')) continue;
     const secs = cats.map(k => SECAO_DE[k]).filter(Boolean);
-    const secao = PRIORIDADE.find(p => secs.includes(p)) || 'abertos';
+    let secao = PRIORIDADE.find(p => secs.includes(p)) || 'abertos';
+    // "animação" no iptv-org inclui desenho ADULTO: nunca deixar isso no Infantil
+    const ADULTO = /south park|family guy|american dad|rick and morty|beavis|futurama|archer|adult swim|bob'?s burgers|anime|naruto|shippuden|walking dead|terror|horror|zombie|dating|catfish|drag race|reality|shin-?chan|one piece|detective conan|dragon ball|bleach|death note/i;
+    if (secao === 'infantil' && (ADULTO.test(c.name) || ADULTO.test(s.title || ''))) secao = 'series';
     const lang = pt ? 'pt' : es ? 'es' : ['BR', 'PT', 'AO', 'MZ', 'CV'].includes(c.country) ? 'pt' : 'es';
     candidatos.push({ s, c, secao, lang });
   }
@@ -210,6 +217,20 @@ async function main() {
     if ((s.labels || []).some(l => /not 24\/7/i.test(l))) ch.part = 1;
     return ch;
   });
+
+  // Canais oficiais que faltam no iptv-org (lista à mão em extras.json), também testados
+  const extrasFile = join(HERE, 'extras.json');
+  if (existsSync(extrasFile)) {
+    const extras = JSON.parse(readFileSync(extrasFile, 'utf8')).canais || [];
+    const ids = new Set(lista.map(c => c.id)), urls = new Set(lista.map(c => c.u));
+    let n = 0;
+    for (const ex of extras) {
+      if (ids.has(ex.id) || urls.has(ex.u)) continue;
+      if (CHECK && !(await testa({ url: ex.u }))) continue;
+      lista.push(ex); n++;
+    }
+    console.log(`Extras: +${n}`);
+  }
 
   // ordem: Brasil/Portugal primeiro, depois por nome
   const peso = p => (p === 'BR' ? 0 : p === 'PT' ? 1 : 2);

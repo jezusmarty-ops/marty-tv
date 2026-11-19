@@ -21,7 +21,8 @@ Funciona em TV Box, Android TV, Google TV, TV com Android e celular Android.
 ## Jeito 2 — Pelo app Downloader (TVs com Play Store / Google TV)
 
 1. Na Play Store da TV, instale o app **Downloader** (ícone laranja, da AFTVnews).
-2. Abra o Downloader e digite o endereço do APK (vou passar quando estiver publicado).
+2. Abra o Downloader e digite este endereço:
+   **`jezusmarty-ops.github.io/marty-tv/tv3.apk`**
 3. Ele baixa e pergunta se quer instalar → **Instalar**.
 4. Se pedir permissão de "apps desconhecidos", ligue para o Downloader e tente de novo.
 
@@ -53,6 +54,11 @@ Ajustes → **Idioma do app** → Português / Español.
 Canais grátis às vezes saem do ar (é a própria emissora). O app avisa
 "fora do ar" — aperte ▲ ou ▼ para ir para outro. A lista se atualiza sozinha
 toda semana e tira os canais que morreram.
+
+## No PC ou no celular (sem instalar nada)
+
+Abra no navegador: **https://jezusmarty-ops.github.io/marty-tv/tv3/**
+(use as setas do teclado, ou clique com o mouse).
 
 ## Mais filmes de graça
 

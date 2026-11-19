@@ -1,5 +1,5 @@
-# Robô semanal: testa todos os links e publica a lista nova.
-# A TV baixa tv3/catalog.json pelo GitHub Pages — ninguém precisa reinstalar o app.
+# Robô semanal: testa os canais ao vivo, atualiza filmes/séries/vídeos e publica.
+# A TV baixa tv3/catalog.json e tv3/vod.json pelo GitHub Pages — ninguém precisa reinstalar o app.
 name: Lista de canais (semanal)
 
 on:
@@ -18,30 +18,43 @@ concurrency:
 jobs:
   lista:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Montar e testar a lista
+      - name: Canais ao vivo (montar e testar)
         run: node tv3-src/catalog/build-catalog.mjs
       - name: Conferir tamanho mínimo (não publica lista quebrada)
         run: |
           n=$(node -e "console.log(require('./tv3-src/catalog/catalog.json').canais.length)")
           echo "canais: $n"
           test "$n" -ge 800
+      # Filmes e vídeos: se uma fonte falhar, fica a versão da semana anterior (continue-on-error)
+      - name: Filmes e séries (RTVCPlay)
+        continue-on-error: true
+        run: node tv3-src/catalog/vod-rtvc.mjs
+      - name: Contas oficiais (YouTube, Vimeo, Dailymotion)
+        continue-on-error: true
+        run: node tv3-src/catalog/vod-oficiais.mjs
+      - name: nazaret.tv (só páginas novas)
+        continue-on-error: true
+        run: node tv3-src/catalog/vod-nazaret.mjs
+      - name: Juntar vídeos
+        run: node tv3-src/catalog/vod-juntar.mjs
       - name: Copiar para o site
         run: |
           cp tv3-src/catalog/catalog.json tv3/catalog.json
-          node -e "const fs=require('fs');fs.writeFileSync('tv3/catalog.js','window.BUNDLED_CATALOG='+fs.readFileSync('tv3/catalog.json','utf8')+';\n')"
+          cp tv3-src/catalog/vod.json tv3/vod.json
+          node -e "const fs=require('fs');fs.writeFileSync('tv3/catalog.js','window.BUNDLED_CATALOG='+fs.readFileSync('tv3/catalog.json','utf8')+';\n');fs.writeFileSync('tv3/vod.js','window.BUNDLED_VOD='+fs.readFileSync('tv3/vod.json','utf8')+';\n')"
       - name: Publicar
         run: |
           git config user.name "marty-tv-robo"
           git config user.email "actions@users.noreply.github.com"
-          git add tv3/catalog.json tv3/catalog.js tv3-src/catalog/catalog.json
+          git add tv3/catalog.json tv3/catalog.js tv3/vod.json tv3/vod.js tv3-src/catalog/*.json
           git diff --cached --quiet && echo "nada mudou" && exit 0
-          git commit -m "lista de canais: atualização semanal"
+          git commit -m "lista de canais e vídeos: atualização semanal"
           git push
       - name: Pedir ao GitHub Pages para publicar de novo
         env:

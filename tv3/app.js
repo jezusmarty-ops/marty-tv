@@ -8,6 +8,7 @@
   // Onde o robô publica a lista atualizada. A TV baixa daqui; se falhar,
   // usa a última lista salva ou a que veio dentro do app.
   var CATALOG_URL = 'https://jezusmarty-ops.github.io/marty-tv/tv3/catalog.json';
+  var VOD_URL = 'https://jezusmarty-ops.github.io/marty-tv/tv3/vod.json';
   var CATALOG_MAX_AGE_MS = 6 * 3600 * 1000;
   var APP_VERSION = '3.0.0';
 
@@ -88,6 +89,8 @@
     { pkgs: ['com.google.android.youtube.tv', 'com.google.android.youtube'], n: 'YouTube', ic: '▶️', d: { pt: 'Filmes completos, música e desenhos', es: 'Películas completas, música y caricaturas' } },
     { pkgs: ['com.tubitv'], n: 'Tubi', ic: '🍿', d: { pt: 'Filmes grátis com propaganda', es: 'Películas gratis con anuncios' } },
     { pkgs: ['com.plexapp.android'], n: 'Plex', ic: '🎞️', d: { pt: 'Filmes e canais grátis', es: 'Películas y canales gratis' } },
+    { pkgs: ['br.com.netmovies.android'], n: 'NetMovies', ic: '🎬', d: { pt: 'Milhares de filmes grátis em português', es: 'Miles de películas gratis en portugués' } },
+    { pkgs: ['com.mercadolibre.android.mplay_tv', 'com.mercadolibre'], n: 'Mercado Play', ic: '🛒', d: { pt: 'Filmes e séries grátis (atenção: tem aluguel pago)', es: 'Películas y series gratis (ojo: tiene alquiler pago)' } },
   ];
 
   // ------------------------------------------------------------------ estado
@@ -104,6 +107,11 @@
   var lastFocusId = {};
   var gridState = null;        // { list, shown, key }
   var heroCh = null;
+
+  // vídeos sob demanda (filmes, séries, YouTube oficial, nazaret.tv) e gloria.tv
+  var vod = null, vodById = {};
+  var glItems = [], glNext = {}, glLang = 'es', glLoading = false;
+  function tt(pt, es) { return lang === 'es' ? es : pt; }
 
   var BROKEN_TTL = 12 * 3600 * 1000;
   function isBroken(id) { var b = broken[id]; return b && Date.now() - b < BROKEN_TTL; }
@@ -201,6 +209,15 @@
       items.push({ k: 'sec:' + s.id, ic: s.icon, lb: secName(s) });
     });
     items.push({ sep: 1 });
+    if (vod) {
+      items.push({ k: 'vod', ic: '🎞️', lb: tt('Filmes e Séries', 'Películas y Series') });
+      items.push({ k: 'yt', ic: '▶️', lb: 'YouTube' });
+      if (!kids) {
+        items.push({ k: 'nz', ic: '⛪', lb: 'nazaret.tv' });
+        items.push({ k: 'gl', ic: '🙏', lb: 'gloria.tv' });
+      }
+      items.push({ sep: 1 });
+    }
     if (!kids) items.push({ k: 'apps', ic: '🧩', lb: t('apps') });
     items.push({ k: 'settings', ic: '⚙️', lb: t('settings') });
     return items;
@@ -219,6 +236,7 @@
   }
   function currentNavKey() {
     if (page.name === 'section') return 'sec:' + page.arg.id;
+    if (page.name === 'vodgrid' || page.name === 'detail') return (page.arg && page.arg.src) || 'vod';
     return page.name;
   }
 
@@ -339,9 +357,12 @@
     if (!query.trim()) { setHTML(res, ''); gridState = null; return; }
     var q = norm(query.trim());
     var list = best(cat.canais.filter(function (c) { return visible(c) && norm(c.n).indexOf(q) >= 0; }));
+    // também procura nos filmes, séries e vídeos
+    var vl = vodList(function (x) { return norm(x.t).indexOf(q) >= 0; }).slice(0, 120);
+    list = list.concat(vl.map(function (x) { return { id: 'v-' + x.id, _vod: x }; }));
     if (!list.length) { setHTML(res, '<div class="empty"><div class="big">🤷</div>' + esc(t('noResults')) + '</div>'); gridState = null; return; }
     setHTML(res, '<div class="grid" id="grid"></div>');
-    gridState = { list: list, shown: 0, key: 'sr' };
+    gridState = { list: list, shown: 0, key: 'sr', renderFn: function (x, key, i) { return x._vod ? vodCard(x._vod, key, i) : card(x, key, i); } };
     growGrid(30);
   }
 
@@ -366,13 +387,314 @@
     return '<div class="opt f" data-key="' + key + '" data-set="' + key + '"><div class="ic">' + ic + '</div><div><div class="t">' + esc(title) + '</div><div class="d">' + esc(desc) + '</div></div><div class="v">' + esc(val) + '</div></div>';
   }
 
+  // ================================================================== FILMES, SÉRIES E VÍDEOS
+  // Fontes: RTVCPlay (TV pública da Colômbia, toca no player do app), YouTube/Vimeo/Dailymotion
+  // oficiais e nazaret.tv (tocam no player oficial deles, embutido), gloria.tv (lista lida na hora).
+
+  // baixa texto pelo Android (sem bloqueio de navegador) ou, no PC, pelo navegador
+  function fetchText(url, ms) {
+    if (Native && Native.fetchText) {
+      return new Promise(function (res, rej) {
+        var id = 'f' + (++fetchSeq);
+        var timer = setTimeout(function () { delete fetchCbs[id]; rej(new Error('tempo')); }, ms || 25000);
+        fetchCbs[id] = function (ok, text) { clearTimeout(timer); if (ok) res(text); else rej(new Error('rede')); };
+        Native.fetchText(url, id);
+      });
+    }
+    return new Promise(function (res, rej) {
+      var x = new XMLHttpRequest();
+      x.open('GET', url);
+      x.timeout = ms || 25000;
+      x.onload = function () { if (x.status === 200) res(x.responseText); else rej(new Error('HTTP ' + x.status)); };
+      x.onerror = x.ontimeout = function () { rej(new Error('rede')); };
+      x.send();
+    });
+  }
+
+  function setVod(v) {
+    vod = v;
+    vodById = {};
+    for (var i = 0; i < v.itens.length; i++) vodById[v.itens[i].id] = v.itens[i];
+  }
+  function initVod() {
+    var had = !!vod;
+    if (window.BUNDLED_VOD) setVod(window.BUNDLED_VOD);
+    fetchText(VOD_URL + '?t=' + Date.now(), 30000).then(function (txt) {
+      var v = JSON.parse(txt);
+      if (v && v.itens && v.itens.length > 20 && (!vod || v.gerado > vod.gerado)) {
+        setVod(v);
+        if (!had) renderRail();
+      }
+    }).catch(function () { /* fica com a lista que veio no app */ });
+  }
+
+  function vodVisible(x) { return kids ? !!x.kids && !x.adulto : true; }
+  function vodList(fn) {
+    if (!vod) return [];
+    return vod.itens.filter(function (x) { return vodVisible(x) && fn(x); });
+  }
+  function vodSrc(x) { return x.f === 'youtube' ? 'yt' : x.f === 'nazaret' ? 'nz' : 'vod'; }
+  function fonteNome(x) {
+    return { rtvc: 'RTVCPlay', vimeo: 'Vimeo', dailymotion: 'Dailymotion', youtube: 'YouTube', nazaret: 'nazaret.tv' }[x.f] || '';
+  }
+  function epCount(x) { var n = 0; (x.temp || []).forEach(function (s) { n += s.eps.length; }); return n; }
+
+  // fileiras de cada tela
+  var VOD_ROWS = {
+    vod: [
+      ['filmes', function () { return '🎬 ' + tt('Filmes', 'Películas'); }, function (x) { return x.k === 'filme' && (x.f === 'rtvc' || x.f === 'vimeo'); }],
+      ['series', function () { return '🍿 ' + tt('Séries e novelas', 'Series y novelas'); }, function (x) { return x.k === 'serie' && (x.f === 'rtvc' || x.f === 'dailymotion'); }],
+      ['infantil', function () { return '🧸 Infantil'; }, function (x) { return x.k === 'infantil' && x.f === 'rtvc'; }],
+      ['docs', function () { return '🌎 ' + tt('Documentários', 'Documentales'); }, function (x) { return x.k === 'doc' && (x.f === 'rtvc' || x.f === 'vimeo'); }],
+      ['musica', function () { return '🎵 ' + tt('Música', 'Música'); }, function (x) { return x.k === 'musica' && x.f === 'rtvc'; }],
+    ],
+    yt: [
+      ['ytkpt', function () { return '🧸 Infantil · Português'; }, function (x) { return x.f === 'youtube' && x.k === 'infantil' && x.l === 'pt'; }],
+      ['ytkes', function () { return '🧸 Infantil · Español'; }, function (x) { return x.f === 'youtube' && x.k === 'infantil' && x.l === 'es'; }],
+      ['ytfil', function () { return '🎬 ' + tt('Filmes completos', 'Películas completas'); }, function (x) { return x.f === 'youtube' && x.k === 'filme'; }],
+      ['ytser', function () { return '🍿 ' + tt('Novelas e séries', 'Novelas y series'); }, function (x) { return x.f === 'youtube' && x.k === 'serie'; }],
+      ['ytdoc', function () { return '🌎 ' + tt('Documentários', 'Documentales'); }, function (x) { return x.f === 'youtube' && x.k === 'doc'; }],
+      ['ytnews', function () { return '📰 ' + tt('Notícias ao vivo', 'Noticias en vivo'); }, function (x) { return x.f === 'youtube' && x.k === 'noticias'; }],
+    ],
+    nz: ['Películas', 'Documentales', 'Música', 'Catequesis', 'Misa del día', 'Homilías'].map(function (c) {
+      return ['nz-' + c, function () { return c; }, function (x) { return x.f === 'nazaret' && x.c === c; }];
+    }),
+  };
+  function rowDef(src, id) {
+    var rows = VOD_ROWS[src] || [];
+    for (var i = 0; i < rows.length; i++) if (rows[i][0] === id) return rows[i];
+    return null;
+  }
+
+  function vodCard(x, key, idx) {
+    var img = safeUrl(x.i);
+    var thumb = img
+      ? '<img src="' + img + '" loading="lazy" alt="" data-ini="' + esc(initials(x.t)) + '" onerror="this.parentNode.innerHTML=\'<div class=ini>\'+this.getAttribute(\'data-ini\')+\'</div>\'">'
+      : '<div class="ini">' + esc(initials(x.t)) + '</div>';
+    var sub = esc(fonteNome(x));
+    if (x.live) sub += ' <span class="badge off">' + esc(tt('AO VIVO', 'EN VIVO')) + '</span>';
+    else if (x.temp) sub += ' · ' + epCount(x) + ' ' + esc(tt('vídeos', 'videos'));
+    else if (x.dur) sub += ' · ' + esc(x.dur);
+    // ao vivo e vídeos soltos tocam direto; o resto abre a página com sinopse/episódios
+    var act = (x.live || (!x.temp && x.f === 'nazaret'))
+      ? ' data-vplay="' + esc(x.id) + '"'
+      : ' data-go="detail:' + vodSrc(x) + ':' + esc(x.id) + '"';
+    return '<div class="card vposter f" data-key="' + esc(key) + '"' + act + (idx != null ? ' data-idx="' + idx + '"' : '') + '>' +
+      '<div class="thumb" style="--tint:' + tint(x.id) + '">' + thumb + '</div>' +
+      '<div class="meta"><div class="nm">' + esc(x.t) + '</div><div class="sub">' + sub + '</div></div></div>';
+  }
+
+  function vrow(src, id, title, list) {
+    if (!list.length) return '';
+    var h = '<section class="row"><div class="row-head"><div class="row-title">' + esc(title) + '</div><div class="row-count">' + list.length + '</div></div><div class="row-track" data-row="' + esc(id) + '">';
+    list.slice(0, 16).forEach(function (x, i) { h += vodCard(x, id + ':' + x.id, i); });
+    if (list.length > 16) h += moreCard(id + ':more', t('seeAll'), 'vodgrid:' + src + ':' + id);
+    return h + '</div></section>';
+  }
+
+  function pageVodHome(src) {
+    var titulo = { vod: '🎞️ ' + tt('Filmes e Séries', 'Películas y Series'), yt: '▶️ YouTube', nz: '⛪ nazaret.tv' }[src];
+    var nota = {
+      vod: tt('Acervo grátis da TV pública da Colômbia (RTVCPlay) e contas oficiais no Vimeo e Dailymotion.', 'Acervo gratuito de la TV pública de Colombia (RTVCPlay) y cuentas oficiales en Vimeo y Dailymotion.'),
+      yt: tt('Só canais oficiais dos donos dos programas. Toca aqui mesmo, no player do YouTube.', 'Solo canales oficiales. Se reproduce aquí mismo, en el reproductor de YouTube.'),
+      nz: tt('Catálogo católico do nazaret.tv (vídeos tocam pelo player do YouTube).', 'Catálogo católico de nazaret.tv (los videos se reproducen con el reproductor de YouTube).'),
+    }[src];
+    if (src === 'nz' && kids) return pageHome();
+    var h = '<div class="page-head"><div class="page-title">' + esc(titulo) + '</div></div><p class="note">' + esc(nota) + '</p>';
+    if (!vod) return h + '<div class="empty"><div class="big">⏳</div>' + esc(t('loading')) + '</div>';
+    var algum = false;
+    (VOD_ROWS[src] || []).forEach(function (r) {
+      var list = vodList(r[2]);
+      if (list.length) algum = true;
+      h += vrow(src, r[0], r[1](), list);
+    });
+    if (!algum) h += '<div class="empty"><div class="big">🤷</div>' + esc(t('noResults')) + '</div>';
+    return h;
+  }
+
+  function pageVodGrid(arg) {
+    var r = rowDef(arg.src, arg.id);
+    if (!r) return pageHome();
+    var list = vodList(r[2]);
+    var h = '<div class="page-head"><div class="page-title">' + esc(r[1]()) + '</div><div class="page-sub">' + list.length + '</div></div><div class="grid" id="grid"></div>';
+    gridState = { list: list, shown: 0, key: 'vg', renderFn: vodCard };
+    return h;
+  }
+
+  function epCard(e, key, idx) {
+    var img = safeUrl(e.i) || safeUrl(e._x.i);
+    var thumb = img ? '<img src="' + img + '" loading="lazy" alt="" onerror="this.style.display=\'none\'">' : '<div class="ini">▶</div>';
+    return '<div class="card vposter f" data-key="' + esc(key) + '" data-ep="' + esc(e.id) + '" data-idx="' + idx + '">' +
+      '<div class="thumb" style="--tint:' + tint(e.id) + '">' + thumb + '</div>' +
+      '<div class="meta"><div class="nm">' + esc(e.t) + '</div><div class="sub">' + esc(e.dur || '') + '</div></div></div>';
+  }
+
+  function pageDetail(arg) {
+    var x = vodById[arg.id];
+    if (!x || !vodVisible(x)) return pageHome();
+    var img = safeUrl(x.i);
+    var h = '<div class="detail">' + (img ? '<img class="detail-img" src="' + img + '" alt="" onerror="this.style.display=\'none\'">' : '') +
+      '<div class="detail-txt"><div class="detail-src">' + esc(fonteNome(x)) + (x.c && x.c !== fonteNome(x) ? ' · ' + esc(x.c) : '') + (x.r ? ' · ' + esc(x.r) : '') + '</div>' +
+      '<h1>' + esc(x.t) + '</h1>' + (x.d ? '<p>' + esc(x.d) + '</p>' : '');
+    if (!x.temp) {
+      h += '<div class="hero-btns"><button class="btn primary f" data-key="d-play" data-vplay="' + esc(x.id) + '">▶ ' + esc(t('watch')) + '</button></div></div></div>';
+      return h;
+    }
+    h += '<div class="detail-src">' + epCount(x) + ' ' + esc(tt('vídeos', 'videos')) + '</div></div></div>';
+    var si = Math.min(arg.season || 0, x.temp.length - 1);
+    if (x.temp.length > 1) {
+      h += '<div class="chips">';
+      x.temp.forEach(function (s, i) {
+        h += '<div class="chip f' + (i === si ? ' on' : '') + '" data-key="season-' + i + '" data-season="' + i + '">' + esc(s.n) + ' <span style="opacity:.55">' + s.eps.length + '</span></div>';
+      });
+      h += '</div>';
+    }
+    h += '<div class="grid" id="grid"></div>';
+    gridState = {
+      list: x.temp[si].eps.map(function (e, ei) { return { id: x.id + '|' + si + '|' + ei, t: e.t, i: e.i, dur: e.dur, _x: x }; }),
+      shown: 0, key: 'ep', renderFn: epCard,
+    };
+    return h;
+  }
+
+  // ---- tocar
+  function rtvcUrl(asset) { return 'https://streaming.rtvc.gov.co/RTVCPlay-vod/smil:' + encodeURIComponent(asset) + '.smil/playlist.m3u8'; }
+
+  function playHls(id, title, url, meta) {
+    var item = { id: id, n: title, u: url, meta: meta || '' };
+    if (Native && Native.playVod) { try { Native.playVod(JSON.stringify(item), lang); return; } catch (e) { /* PC */ } }
+    webPlay([item], 0);
+  }
+
+  function playEmbed(kind, id, title) {
+    if (Native && Native.embed) { try { Native.embed(kind, String(id), title || ''); return; } catch (e) { /* PC */ } }
+    var src = {
+      youtube: 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent(id) + '?autoplay=1&rel=0',
+      ytlive: 'https://www.youtube-nocookie.com/embed/live_stream?channel=' + encodeURIComponent(id) + '&autoplay=1',
+      vimeo: 'https://player.vimeo.com/video/' + encodeURIComponent(id) + '?autoplay=1',
+      dailymotion: 'https://www.dailymotion.com/embed/video/' + encodeURIComponent(id) + '?autoplay=1',
+      gloria: 'https://gloria.tv/post/' + encodeURIComponent(id) + '/embed',
+    }[kind];
+    if (!src) return;
+    var root = document.createElement('div');
+    root.id = 'webplayer';
+    var f = document.createElement('iframe');
+    f.src = src;
+    f.setAttribute('allow', 'autoplay; fullscreen; encrypted-media');
+    f.setAttribute('allowfullscreen', '');
+    f.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;border:0';
+    root.appendChild(f);
+    document.body.appendChild(root);
+  }
+
+  // capítulo da RTVCPlay: o id do vídeo está na página do capítulo (buscada só na hora de tocar)
+  function playRtvcPage(path, id, title) {
+    toast(t('opening'));
+    fetchText('https://www.rtvcplay.co' + path, 25000).then(function (html) {
+      var i = html.indexOf('window.__RTVCPLAY_STATE__ =');
+      var j = html.indexOf('</script>', i);
+      var st = JSON.parse(html.slice(i + 27, j).replace(/;\s*$/, ''));
+      var c = st.content && st.content.currentContent;
+      if (!c || c.geoblocking || !c.video || !c.video.assetid) throw new Error('sem vídeo');
+      playHls(id, title, rtvcUrl(String(c.video.assetid)), 'RTVCPlay · Colombia');
+    }).catch(function () { toast(t('offline')); });
+  }
+
+  function playVodItem(x) {
+    if (x.live) return playEmbed('ytlive', x.live, x.t);
+    if (x.f === 'rtvc' && x.a) return playHls(x.id, x.t, rtvcUrl(x.a), 'RTVCPlay · Colombia');
+    if (x.f === 'vimeo' && x.e) return playEmbed('vimeo', x.e, x.t);
+    if (x.f === 'dailymotion' && x.e) return playEmbed('dailymotion', x.e, x.t);
+    if (x.y) return playEmbed('youtube', x.y, x.t);
+    if (x.temp) return playEpisode(x, 0, 0);
+  }
+
+  function playEpisode(x, ti, ei) {
+    var s = x.temp && x.temp[ti];
+    var e = s && s.eps[ei];
+    if (!e) return;
+    var titulo = x.t + ' · ' + e.t;
+    if (x.f === 'rtvc' && e.s) return playRtvcPage(e.s, x.id + '-' + ti + '-' + ei, titulo);
+    if (e.y) return playEmbed('youtube', e.y, titulo);
+    if (e.e && x.f === 'dailymotion') return playEmbed('dailymotion', e.e, titulo);
+    if (e.e && x.f === 'vimeo') return playEmbed('vimeo', e.e, titulo);
+  }
+
+  // ---- gloria.tv: lista lida na hora (as miniaturas deles vencem em 1–2 dias)
+  function pageGloria() {
+    if (kids) return pageHome();
+    var h = '<div class="page-head"><div class="page-title">🙏 gloria.tv</div><div class="page-sub">' + glItems.length + ' ' + esc(tt('vídeos', 'videos')) + '</div></div>' +
+      '<p class="note">' + esc(tt('Vídeos enviados pela comunidade do gloria.tv (sem moderação do Marty TV). Tocam pelo player do próprio site.', 'Videos subidos por la comunidad de gloria.tv (sin moderación de Marty TV). Se reproducen con el reproductor del sitio.')) + '</p>' +
+      '<div class="chips"><div class="chip f' + (glLang === 'es' ? ' on' : '') + '" data-key="gllang-es" data-gllang="es">Español</div>' +
+      '<div class="chip f' + (glLang === 'pt' ? ' on' : '') + '" data-key="gllang-pt" data-gllang="pt">Português</div></div>';
+    if (!Native || !Native.fetchText) h += '<div class="empty">' + esc(tt('Esta seção funciona no app da TV.', 'Esta sección funciona en la app de la TV.')) + '</div>';
+    else if (!glItems.length) h += '<div class="empty"><div class="big">⏳</div>' + esc(t('loading')) + '</div>';
+    h += '<div class="grid" id="grid"></div>';
+    var list = glItems.slice();
+    if (glNext[glLang]) list.push({ id: 'more', _more: 1 });
+    gridState = { list: list, shown: 0, key: 'gl', renderFn: glCard };
+    return h;
+  }
+  function glCard(x, key, idx) {
+    if (x._more) return '<div class="card more f" data-key="' + esc(key) + '" data-glmore="1" data-idx="' + idx + '"><div class="thumb"><div class="ini">' + esc(tt('Carregar mais', 'Cargar más')) + ' ↓</div></div><div class="meta"><div class="nm">&nbsp;</div></div></div>';
+    var img = safeUrl(x.i);
+    return '<div class="card vposter f" data-key="' + esc(key) + '" data-gl="' + esc(x.id) + '" data-title="' + esc(x.t) + '" data-idx="' + idx + '">' +
+      '<div class="thumb" style="--tint:' + tint(x.id) + '">' + (img ? '<img src="' + img + '" loading="lazy" alt="" onerror="this.style.display=\'none\'">' : '<div class="ini">▶</div>') + '</div>' +
+      '<div class="meta"><div class="nm">' + esc(x.t) + '</div><div class="sub">' + esc(x.a || '') + (x.dur ? ' · ' + esc(x.dur) : '') + '</div></div></div>';
+  }
+  function parseGloria(html) {
+    var doc = new DOMParser().parseFromString(html, 'text/html');
+    var out = [];
+    $all('section.card', doc).forEach(function (sec) {
+      var tile = sec.querySelector('figure.tile[data-media]');
+      if (!tile || (tile.getAttribute('data-media') || '').indexOf('"video"') < 0) return;
+      var a = tile.querySelector('a[href^="/post/"]');
+      var m = a && (a.getAttribute('href') || '').match(/\/post\/(\w{25})/);
+      if (!m) return;
+      var p = sec.querySelector('p');
+      var txt = p ? (p.textContent || '').replace(/\s+/g, ' ').trim() : '';
+      var img = tile.querySelector('img');
+      var dur = tile.querySelector('.topleft');
+      var cite = sec.querySelector('cite');
+      out.push({
+        id: m[1],
+        t: (txt || (cite ? cite.textContent : '') || 'gloria.tv').slice(0, 90),
+        i: img ? img.getAttribute('src') : '',
+        dur: dur ? dur.textContent.trim() : '',
+        a: cite ? cite.textContent.trim() : '',
+      });
+    });
+    var nx = doc.querySelector('a[href^="/pagination/"]');
+    return { itens: out, next: nx ? nx.getAttribute('href') : null };
+  }
+  function loadGloria(more) {
+    if (glLoading || !Native || !Native.fetchText) return;
+    glLoading = true;
+    var path = more && glNext[glLang] ? glNext[glLang] : '/language/' + glLang;
+    var lg = glLang;
+    fetchText('https://gloria.tv' + path, 25000).then(function (html) {
+      glLoading = false;
+      if (lg !== glLang) return;
+      var r = parseGloria(html);
+      var seen = {};
+      glItems.forEach(function (x) { seen[x.id] = 1; });
+      r.itens.forEach(function (x) { if (!seen[x.id]) glItems.push(x); });
+      glNext[glLang] = r.next;
+      if (page.name === 'gl') {
+        var k = focusEl && focusEl.getAttribute('data-key');
+        render(k && k.indexOf('gl:more') === 0 ? 'gl:' + (glItems[glItems.length - r.itens.length] || {}).id : k);
+      }
+    }).catch(function () { glLoading = false; toast(t('updateFail')); });
+  }
+
   // grade desenhada aos poucos (TV box fraca não aguenta 800 cartões de uma vez)
   function growGrid(n) {
     var g = $('#grid');
     if (!g || !gridState) return;
     var end = Math.min(gridState.list.length, gridState.shown + n);
     var h = '';
-    for (var i = gridState.shown; i < end; i++) h += card(gridState.list[i], gridState.key + ':' + gridState.list[i].id, i);
+    var draw = gridState.renderFn || card;
+    for (var i = gridState.shown; i < end; i++) h += draw(gridState.list[i], gridState.key + ':' + gridState.list[i].id, i);
     g.insertAdjacentHTML('beforeend', h);
     gridState.shown = end;
   }
@@ -390,11 +712,16 @@
       case 'search': h = pageSearch(); break;
       case 'apps': h = pageApps(); break;
       case 'settings': h = pageSettings(); break;
+      case 'vod': case 'yt': case 'nz': h = pageVodHome(page.name); break;
+      case 'vodgrid': h = pageVodGrid(page.arg); break;
+      case 'detail': h = pageDetail(page.arg); break;
+      case 'gl': h = pageGloria(); break;
       default: h = pageHome();
     }
     setHTML(c, h);
     if (page.name === 'search') updateSearch();
     else if (gridState) growGrid(40);
+    if (page.name === 'gl' && !glItems.length && !glLoading) loadGloria(false);
     renderRail();
     $('#scroller').scrollTop = 0;
     var want = keepFocusKey || lastFocusId[pageKey()];
@@ -415,7 +742,13 @@
     history.push({ name: page.name, arg: page.arg });
     if (history.length > 20) history.shift();
     if (target.indexOf('sec:') === 0) page = { name: 'section', arg: { id: target.slice(4), country: arg || '' } };
-    else page = { name: target, arg: null };
+    else if (target.indexOf('vodgrid:') === 0) {
+      var p = target.split(':'); // vodgrid:<origem>:<fileira>
+      page = { name: 'vodgrid', arg: { id: p[2], src: p[1] } };
+    } else if (target.indexOf('detail:') === 0) {
+      var d = target.split(':'); // detail:<origem>:<id do item>
+      page = { name: 'detail', arg: { id: d.slice(2).join(':'), src: d[1], season: 0 } };
+    } else page = { name: target, arg: null };
     if (target === 'search') query = '';
     render();
   }
@@ -516,6 +849,15 @@
     }
     var chId = el.getAttribute('data-ch');
     if (chId) { play(chId, el); return; }
+    var vplay = el.getAttribute('data-vplay');
+    if (vplay) { var vx = vodById[vplay]; if (vx) playVodItem(vx); return; }
+    var ep = el.getAttribute('data-ep');
+    if (ep) { var pe = ep.split('|'); var px = vodById[pe[0]]; if (px) playEpisode(px, +pe[1], +pe[2]); return; }
+    if (el.hasAttribute('data-season')) { page.arg.season = +el.getAttribute('data-season'); render('season-' + page.arg.season); return; }
+    var gl = el.getAttribute('data-gl');
+    if (gl) { playEmbed('gloria', gl, el.getAttribute('data-title') || ''); return; }
+    if (el.hasAttribute('data-gllang')) { glLang = el.getAttribute('data-gllang'); glItems = []; glNext = {}; render('gllang-' + glLang); return; }
+    if (el.hasAttribute('data-glmore')) { loadGloria(true); return; }
     var favId = el.getAttribute('data-fav');
     if (favId) { toggleFav(favId); render('hero-fav'); return; }
     if (el.hasAttribute('data-country')) { page.arg.country = el.getAttribute('data-country'); render('chip-' + (page.arg.country || 'all')); return; }
@@ -784,6 +1126,7 @@
 
     var hadCatalog = !!window.BUNDLED_CATALOG;
     try { hadCatalog = hadCatalog || !!localStorage.getItem('mtv3.catalog'); } catch (e) { /* */ }
+    initVod();
     var p = initCatalog();
     function first() {
       if (!cat) { $('#splash-msg').textContent = t('noCatalog'); return; }

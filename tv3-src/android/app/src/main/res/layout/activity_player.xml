@@ -88,6 +88,15 @@
                 android:layout_marginTop="2dp"
                 android:textColor="#C8CCD8"
                 android:textSize="16sp" />
+
+            <TextView
+                android:id="@+id/pTracks"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:textColor="#FFB03B"
+                android:textSize="14sp"
+                android:visibility="gone" />
         </LinearLayout>
 
         <TextView

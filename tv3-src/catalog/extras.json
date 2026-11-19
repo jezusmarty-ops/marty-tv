@@ -1,0 +1,10 @@
+{
+  "_sobre": "Canais oficiais que não estão no iptv-org. Mesmo formato do catalog.json. O robô testa antes de incluir.",
+  "canais": [
+    { "id": "ClanInternacional.es", "n": "Clan Internacional", "s": "infantil", "p": "ES", "l": "es", "hd": 1,
+      "u": "https://rtvelivestream-rtveplayplus.rtve.es/rtvesec/int/clan_int_main_1080.m3u8",
+      "i": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2c/Clan_TVE_logo.svg/320px-Clan_TVE_logo.svg.png" },
+    { "id": "Canal22.mx", "n": "Canal 22", "s": "docs", "p": "MX", "l": "es",
+      "u": "https://5fc584f3f19c9.streamlock.net/canal22/smil:canal22.smil/playlist.m3u8" }
+  ]
+}

@@ -82,6 +82,32 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        /** Filme/episódio sob demanda (HLS/MP4) no player nativo, com barra de tempo. */
+        @android.webkit.JavascriptInterface
+        fun playVod(itemJson: String, lang: String) {
+            runOnUiThread {
+                val i = Intent(this@MainActivity, PlayerActivity::class.java)
+                    .putExtra(PlayerActivity.EXTRA_ITEMS, "[$itemJson]")
+                    .putExtra(PlayerActivity.EXTRA_INDEX, 0)
+                    .putExtra(PlayerActivity.EXTRA_LANG, lang)
+                    .putExtra(PlayerActivity.EXTRA_VOD, true)
+                playerLauncher.launch(i)
+            }
+        }
+
+        /** Vídeo pelo player oficial da plataforma (YouTube, Vimeo, Dailymotion, gloria.tv). */
+        @android.webkit.JavascriptInterface
+        fun embed(kind: String, id: String, title: String) {
+            runOnUiThread {
+                startActivity(
+                    Intent(this@MainActivity, EmbedActivity::class.java)
+                        .putExtra(EmbedActivity.EXTRA_KIND, kind)
+                        .putExtra(EmbedActivity.EXTRA_ID, id)
+                        .putExtra(EmbedActivity.EXTRA_TITLE, title)
+                )
+            }
+        }
+
         /** Abre outro app instalado (Pluto TV, YouTube...). */
         @android.webkit.JavascriptInterface
         fun openApp(pkg: String): Boolean {

@@ -27,6 +27,3 @@ Entra: idioma português/espanhol ou país lusófono/hispânico.
 Sai: adultos, canais fechados, bloqueados pelo iptv-org (DMCA), nomes de canais pagos
 (HBO, Telecine, ESPN, Globo News…), links em IP solto (típico de retransmissão), televendas,
 versões de outros países, e todo link que não respondeu no teste.
-
-> Neste repositório a interface (pasta `web/` do projeto local) é publicada em `tv3/`.
-> O robô semanal (`.github/workflows/lista-canais.yml`) roda `tv3-src/catalog/build-catalog.mjs` e atualiza `tv3/catalog.json`.
